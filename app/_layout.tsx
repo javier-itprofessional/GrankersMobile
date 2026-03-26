@@ -1,57 +1,60 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
-import 'react-native-reanimated';
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Stack } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import React, { useEffect } from "react";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { CompetitionProvider } from "../providers/CompetitionProvider";
+import { FreePlayProvider } from "../providers/FreePlayProvider";
+import { PlayerAuthContext } from "../providers/PlayerAuthProvider";
+import { trpc, trpcClient } from "../lib/trpc";
 
-import { useColorScheme } from '@/components/useColorScheme';
-
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from 'expo-router';
-
-export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
-};
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
-  const [loaded, error] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
-
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
-  useEffect(() => {
-    if (error) throw error;
-  }, [error]);
-
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
-
-  if (!loaded) {
-    return null;
-  }
-
-  return <RootLayoutNav />;
-}
+const queryClient = new QueryClient();
 
 function RootLayoutNav() {
-  const colorScheme = useColorScheme();
+  return (
+    <Stack screenOptions={{ headerBackTitle: "Atrás" }}>
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="competition/code-entry" options={{ headerShown: true }} />
+      <Stack.Screen name="competition/confirmation" options={{ headerShown: true }} />
+      <Stack.Screen name="competition/comprobacion" options={{ headerShown: false }} />
+      <Stack.Screen name="game/scoring" options={{ headerShown: false }} />
+      <Stack.Screen name="game/scorecard" options={{ headerShown: true }} />
+      <Stack.Screen name="game/leaderboard" options={{ headerShown: true }} />
+      <Stack.Screen name="game/review" options={{ headerShown: true }} />
+      <Stack.Screen name="game/complete" options={{ headerShown: true }} />
+      <Stack.Screen name="free-play/select-players" options={{ headerShown: true }} />
+      <Stack.Screen name="free-play/setup" options={{ headerShown: true }} />
+      <Stack.Screen name="free-play/search-license" options={{ headerShown: true }} />
+      <Stack.Screen name="player-area/index" options={{ headerShown: true }} />
+      <Stack.Screen name="player-area/login" options={{ headerShown: false }} />
+      <Stack.Screen name="player-area/register" options={{ headerShown: false }} />
+      <Stack.Screen name="player-area/competitions" options={{ headerShown: true }} />
+      <Stack.Screen name="player-area/terms" options={{ headerShown: true }} />
+      <Stack.Screen name="player-area/privacy" options={{ headerShown: true }} />
+    </Stack>
+  );
+}
+
+export default function RootLayout() {
+  useEffect(() => {
+    SplashScreen.hideAsync();
+  }, []);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
-    </ThemeProvider>
+    <trpc.Provider client={trpcClient} queryClient={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <PlayerAuthContext>
+          <CompetitionProvider>
+            <FreePlayProvider>
+              <GestureHandlerRootView style={{ flex: 1 }}>
+                <RootLayoutNav />
+              </GestureHandlerRootView>
+            </FreePlayProvider>
+          </CompetitionProvider>
+        </PlayerAuthContext>
+      </QueryClientProvider>
+    </trpc.Provider>
   );
 }
