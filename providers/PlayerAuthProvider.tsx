@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
-
-const PLAYER_SESSION_KEY = 'player_session';
+import { AuthStorage } from '@/services/auth-storage';
+import { logout as authLogout } from '@/services/auth';
 
 export interface PlayerSession {
   id: string;
@@ -13,50 +12,71 @@ export interface PlayerSession {
   createdAt: string;
 }
 
+function decodeJwtPayload(token: string): Record<string, any> | null {
+  try {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(base64));
+  } catch {
+    return null;
+  }
+}
+
+function sessionFromAccessToken(token: string): PlayerSession | null {
+  const payload = decodeJwtPayload(token);
+  if (!payload) return null;
+
+  const id = payload.user_id || payload.sub || '';
+  if (!id) return null;
+
+  const firstName = payload.first_name || '';
+  const lastName = payload.last_name || '';
+  const name = payload.name || `${firstName} ${lastName}`.trim() || payload.email || '';
+
+  return {
+    id,
+    name,
+    email: payload.email || '',
+    country: payload.country || '',
+    authMethod: 'email',
+    createdAt: new Date().toISOString(),
+  };
+}
+
 export const [PlayerAuthContext, usePlayerAuth] = createContextHook(() => {
   const [session, setSession] = useState<PlayerSession | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  useEffect(() => {
-    loadSession();
-  }, []);
-
-  const loadSession = async () => {
+  const loadSession = useCallback(async () => {
     try {
-      console.log('[PlayerAuth] Loading session from storage...');
-      const stored = await AsyncStorage.getItem(PLAYER_SESSION_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as PlayerSession;
-        console.log('[PlayerAuth] Session found:', parsed.name, parsed.email);
-        setSession(parsed);
-      } else {
-        console.log('[PlayerAuth] No session found');
+      const accessToken = await AuthStorage.getAccessToken();
+      if (!accessToken) {
+        setSession(null);
+        return;
       }
+      const parsed = sessionFromAccessToken(accessToken);
+      setSession(parsed);
     } catch (error) {
       console.error('[PlayerAuth] Error loading session:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const saveSession = useCallback(async (newSession: PlayerSession) => {
-    try {
-      console.log('[PlayerAuth] Saving session:', newSession.name);
-      await AsyncStorage.setItem(PLAYER_SESSION_KEY, JSON.stringify(newSession));
-      setSession(newSession);
-    } catch (error) {
-      console.error('[PlayerAuth] Error saving session:', error);
-      throw error;
+      setSession(null);
     }
   }, []);
+
+  useEffect(() => {
+    loadSession().finally(() => setIsLoading(false));
+  }, [loadSession]);
+
+  // Called by login/register screens after auth service stores tokens
+  const reloadSession = useCallback(async () => {
+    await loadSession();
+  }, [loadSession]);
 
   const clearSession = useCallback(async () => {
     try {
-      console.log('[PlayerAuth] Clearing session');
-      await AsyncStorage.removeItem(PLAYER_SESSION_KEY);
-      setSession(null);
+      await authLogout();
     } catch (error) {
-      console.error('[PlayerAuth] Error clearing session:', error);
+      console.error('[PlayerAuth] Error during logout:', error);
+    } finally {
+      setSession(null);
     }
   }, []);
 
@@ -66,7 +86,7 @@ export const [PlayerAuthContext, usePlayerAuth] = createContextHook(() => {
     session,
     isLoading,
     isAuthenticated,
-    saveSession,
+    reloadSession,
     clearSession,
   };
 });

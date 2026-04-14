@@ -1,11 +1,14 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import * as Linking from "expo-linking";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { CompetitionProvider } from "../providers/CompetitionProvider";
 import { FreePlayProvider } from "../providers/FreePlayProvider";
 import { PlayerAuthContext } from "../providers/PlayerAuthProvider";
+import { configureGoogleSignIn } from "../services/auth";
+import { verifyMagicLink } from "../services/auth";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -38,7 +41,41 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   useEffect(() => {
+    configureGoogleSignIn();
     SplashScreen.hideAsync();
+  }, []);
+
+  useEffect(() => {
+    const handleDeepLink = async (url: string) => {
+      const parsed = Linking.parse(url);
+      const isAuthPath =
+        parsed.path?.includes('auth/magic-link') ||
+        parsed.hostname === 'auth' && parsed.path?.includes('magic-link');
+
+      if (!isAuthPath) return;
+
+      const token = parsed.queryParams?.token as string | undefined;
+      if (!token) return;
+
+      try {
+        await verifyMagicLink(token);
+        router.replace('/player-area');
+      } catch {
+        router.replace('/player-area/login?error=invalid_link');
+      }
+    };
+
+    // Handle deep link when app is already open
+    const subscription = Linking.addEventListener('url', (event) => {
+      handleDeepLink(event.url);
+    });
+
+    // Handle deep link that launched the app
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink(url);
+    });
+
+    return () => subscription.remove();
   }, []);
 
   return (
