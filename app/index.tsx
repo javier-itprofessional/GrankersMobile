@@ -10,13 +10,15 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Trophy, Users, User, ChevronRight, LogIn, UserPlus } from 'lucide-react-native';
+import { Trophy, Users, User, ChevronRight, Mail, UserPlus } from 'lucide-react-native';
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '../constants/colors';
 import { useCompetition } from '../providers/CompetitionProvider';
 import { useFreePlay } from '../providers/FreePlayProvider';
 import { usePlayerAuth } from '../providers/PlayerAuthProvider';
+import { loginWithGoogle } from '../services/auth';
 import { findCompetitionByDeviceId, getPlayerHoleScores } from '../config/firebase';
 import type { FoundCompetitionSession } from '../config/firebase';
 
@@ -27,8 +29,19 @@ export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
   const { isLoaded: compLoaded, competition, currentScreen, deviceId, startCompetition, setDevicePlayerId, setScoringModeAndPlayers, goToHole, resetCompetition } = useCompetition();
   const { gameStarted, isLoaded: freePlayLoaded, currentScreen: freePlayScreen } = useFreePlay();
-  const { isAuthenticated, isLoading: authLoading } = usePlayerAuth();
+  const { isAuthenticated, isLoading: authLoading, reloadSession } = usePlayerAuth();
   const [screen, setScreen] = useState<Screen>('landing');
+
+  const googleMutation = useMutation({
+    mutationFn: async () => {
+      await loginWithGoogle();
+      await reloadSession();
+    },
+    onSuccess: () => setScreen('menu'),
+    onError: (error: Error) => {
+      Alert.alert('Error', error.message || 'No se pudo iniciar sesión con Google');
+    },
+  });
   const [isCheckingCompetition, setIsCheckingCompetition] = useState<boolean>(false);
 
   const isLoaded = compLoaded && freePlayLoaded && !authLoading;
@@ -255,27 +268,54 @@ export default function WelcomeScreen() {
             { opacity: buttonsAnim, transform: [{ translateY: buttonsAnim.interpolate({ inputRange: [0, 1], outputRange: [30, 0] }) }] },
           ]}
         >
-          {/* Login */}
+          {/* Google Sign-In */}
           <TouchableOpacity
-            style={styles.btnPrimary}
-            onPress={() => router.push('/player-area/login')}
+            style={[styles.btnGoogle, googleMutation.isPending && styles.btnDisabled]}
+            onPress={() => googleMutation.mutate()}
+            disabled={googleMutation.isPending}
             activeOpacity={0.85}
-            testID="landing-login-button"
+            testID="landing-google-button"
           >
-            <LogIn size={20} color="#FFFFFF" strokeWidth={2} />
-            <Text style={styles.btnPrimaryText}>Iniciar sesión</Text>
+            {googleMutation.isPending ? (
+              <ActivityIndicator size="small" color={Colors.golf.text} />
+            ) : (
+              <View style={styles.googleIcon}>
+                <Text style={styles.googleIconLetter}>G</Text>
+              </View>
+            )}
+            <Text style={styles.btnGoogleText}>
+              {googleMutation.isPending ? 'Conectando...' : 'Continuar con Google'}
+            </Text>
           </TouchableOpacity>
 
-          {/* Register */}
-          <TouchableOpacity
-            style={styles.btnSecondary}
-            onPress={() => router.push('/player-area/register')}
-            activeOpacity={0.85}
-            testID="landing-register-button"
-          >
-            <UserPlus size={20} color={Colors.golf.primary} strokeWidth={2} />
-            <Text style={styles.btnSecondaryText}>Crear cuenta</Text>
-          </TouchableOpacity>
+          {/* Divider */}
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>o</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Email row */}
+          <View style={styles.btnRow}>
+            <TouchableOpacity
+              style={[styles.btnHalf, styles.btnHalfPrimary]}
+              onPress={() => router.push('/player-area/login')}
+              activeOpacity={0.85}
+              testID="landing-login-button"
+            >
+              <Mail size={18} color="#FFFFFF" strokeWidth={2} />
+              <Text style={styles.btnHalfPrimaryText}>Iniciar sesión</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.btnHalf, styles.btnHalfSecondary]}
+              onPress={() => router.push('/player-area/register')}
+              activeOpacity={0.85}
+              testID="landing-register-button"
+            >
+              <UserPlus size={18} color={Colors.golf.primary} strokeWidth={2} />
+              <Text style={styles.btnHalfSecondaryText}>Crear cuenta</Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Guest */}
           <TouchableOpacity
@@ -451,51 +491,100 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     gap: 12,
   },
-  btnPrimary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.golf.primary,
-    borderRadius: 16,
-    paddingVertical: 18,
-    gap: 10,
-    shadowColor: Colors.golf.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 14,
-    elevation: 6,
-  },
-  btnPrimaryText: {
-    fontSize: 17,
-    fontWeight: '700' as const,
-    color: '#FFFFFF',
-    letterSpacing: 0.2,
-  },
-  btnSecondary: {
+  btnGoogle: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    paddingVertical: 18,
+    paddingVertical: 16,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  btnDisabled: {
+    opacity: 0.7,
+  },
+  googleIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: '#4285F4',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleIconLetter: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
+  },
+  btnGoogleText: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: Colors.golf.text,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  dividerText: {
+    fontSize: 13,
+    fontWeight: '500' as const,
+    color: 'rgba(255,255,255,0.4)',
+  },
+  btnRow: {
+    flexDirection: 'row',
     gap: 10,
+  },
+  btnHalf: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    paddingVertical: 15,
+    gap: 8,
+  },
+  btnHalfPrimary: {
+    backgroundColor: Colors.golf.primary,
+    shadowColor: Colors.golf.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  btnHalfPrimaryText: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
+  },
+  btnHalfSecondary: {
+    backgroundColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
-    shadowRadius: 8,
+    shadowRadius: 6,
     elevation: 2,
   },
-  btnSecondaryText: {
-    fontSize: 17,
+  btnHalfSecondaryText: {
+    fontSize: 15,
     fontWeight: '700' as const,
     color: Colors.golf.primary,
-    letterSpacing: 0.2,
   },
   btnGhost: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
+    paddingVertical: 14,
     gap: 4,
   },
   btnGhostText: {

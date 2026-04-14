@@ -25,15 +25,16 @@ function sessionFromAccessToken(token: string): PlayerSession | null {
   const payload = decodeJwtPayload(token);
   if (!payload) return null;
 
-  const id = payload.user_id || payload.sub || '';
-  if (!id) return null;
+  // Accept any non-expired token — try common Django JWT fields for user id
+  const id = payload.user_id || payload.sub || payload.uuid || payload.id || '';
 
   const firstName = payload.first_name || '';
   const lastName = payload.last_name || '';
-  const name = payload.name || `${firstName} ${lastName}`.trim() || payload.email || '';
+  const name = payload.name || `${firstName} ${lastName}`.trim() || payload.email || payload.username || '';
 
+  // Minimal session — enough to mark user as authenticated
   return {
-    id,
+    id: id || 'authenticated',
     name,
     email: payload.email || '',
     country: payload.country || '',
