@@ -6,7 +6,6 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { CompetitionProvider } from "../providers/CompetitionProvider";
 import { FreePlayProvider } from "../providers/FreePlayProvider";
 import { PlayerAuthContext } from "../providers/PlayerAuthProvider";
-import { trpc, trpcClient } from "../lib/trpc";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -43,18 +42,16 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <trpc.Provider client={trpcClient} queryClient={queryClient}>
-      <QueryClientProvider client={queryClient}>
-        <PlayerAuthContext>
-          <CompetitionProvider>
-            <FreePlayProvider>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <RootLayoutNav />
-              </GestureHandlerRootView>
-            </FreePlayProvider>
-          </CompetitionProvider>
-        </PlayerAuthContext>
-      </QueryClientProvider>
-    </trpc.Provider>
+    <QueryClientProvider client={queryClient}>
+      <PlayerAuthContext>
+        <CompetitionProvider>
+          <FreePlayProvider>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+              <RootLayoutNav />
+            </GestureHandlerRootView>
+          </FreePlayProvider>
+        </CompetitionProvider>
+      </PlayerAuthContext>
+    </QueryClientProvider>
   );
 }

@@ -1,4 +1,4 @@
-# Grankers app
+# GrankersMobile
 
 ## Project info
 
