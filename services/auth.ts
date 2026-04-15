@@ -15,7 +15,7 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL;
 export function configureGoogleSignIn(): void {
   if (!GoogleSignin) return;
   GoogleSignin.configure({
-    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    webClientId: '1018215047600-7iulb2heq42l7d6pi7ohi9o640e0ig6b.apps.googleusercontent.com',
     offlineAccess: false,
     iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
   });

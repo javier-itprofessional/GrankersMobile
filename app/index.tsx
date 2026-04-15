@@ -7,10 +7,11 @@ import {
   Alert,
   Animated,
   Image,
+  BackHandler,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Trophy, Users, User, ChevronRight, Mail, UserPlus } from 'lucide-react-native';
+import { Trophy, Users, User, ChevronRight, Mail, UserPlus, LogOut, LogIn } from 'lucide-react-native';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -29,7 +30,7 @@ export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
   const { isLoaded: compLoaded, competition, currentScreen, deviceId, startCompetition, setDevicePlayerId, setScoringModeAndPlayers, goToHole, resetCompetition } = useCompetition();
   const { gameStarted, isLoaded: freePlayLoaded, currentScreen: freePlayScreen } = useFreePlay();
-  const { isAuthenticated, isLoading: authLoading, reloadSession } = usePlayerAuth();
+  const { isAuthenticated, isLoading: authLoading, reloadSession, clearSession } = usePlayerAuth();
   const [screen, setScreen] = useState<Screen>('landing');
 
   const googleMutation = useMutation({
@@ -55,6 +56,8 @@ export default function WelcomeScreen() {
   const menuFadeAnim = useRef(new Animated.Value(0)).current;
   const menuSlideAnim = useRef(new Animated.Value(30)).current;
   const buttonAnims = useRef([
+    new Animated.Value(0),
+    new Animated.Value(0),
     new Animated.Value(0),
     new Animated.Value(0),
     new Animated.Value(0),
@@ -356,6 +359,27 @@ export default function WelcomeScreen() {
       subtitle: 'Empezar una nueva partida',
       onPress: () => router.push('/free-play/select-course'),
       testID: 'free-play-button',
+      disabled: false,
+    },
+    ...(isAuthenticated ? [{
+      icon: <LogIn size={24} color="#E53E3E" strokeWidth={2} />,
+      title: 'Cerrar sesión',
+      subtitle: 'Desconectarse de tu cuenta',
+      onPress: () => {
+        Alert.alert('Cerrar sesión', '¿Estás seguro de que quieres cerrar sesión?', [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Cerrar sesión', style: 'destructive', onPress: () => { clearSession(); setScreen('landing'); } },
+        ]);
+      },
+      testID: 'logout-button',
+      disabled: false,
+    }] : []),
+    {
+      icon: <LogOut size={24} color="#E53E3E" strokeWidth={2} />,
+      title: 'Salir',
+      subtitle: 'Cerrar la aplicación',
+      onPress: () => BackHandler.exitApp(),
+      testID: 'exit-button',
       disabled: false,
     },
   ];
