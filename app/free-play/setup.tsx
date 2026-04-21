@@ -4,7 +4,7 @@ import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { Users } from 'lucide-react-native';
 import Colors from '../../constants/colors';
 import { useFreePlay } from '../../providers/FreePlayProvider';
-import { saveFreePlayPlayers } from '@/config/firebase';
+import { saveFreePlayPlayers } from '@/services/game-service';
 import PlayerCard from '../../components/PlayerCard';
 
 

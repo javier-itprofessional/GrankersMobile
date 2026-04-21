@@ -12,7 +12,7 @@ import { useState } from 'react';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { Search } from 'lucide-react-native';
 import Colors from '../../constants/colors';
-import { searchPlayerLicenses } from '@/config/firebase';
+import { searchPlayerLicenses } from '@/services/game-service';
 import SearchResultCard from '../../components/SearchResultCard';
 
 interface LicensePlayer {

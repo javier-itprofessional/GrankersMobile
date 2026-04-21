@@ -4,6 +4,8 @@ import * as SplashScreen from "expo-splash-screen";
 import * as Linking from "expo-linking";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { DatabaseProvider } from "@nozbe/watermelondb/react";
+import { database } from "../database";
 import { CompetitionProvider } from "../providers/CompetitionProvider";
 import { FreePlayProvider } from "../providers/FreePlayProvider";
 import { PlayerAuthContext } from "../providers/PlayerAuthProvider";
@@ -79,16 +81,18 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <PlayerAuthContext>
-        <CompetitionProvider>
-          <FreePlayProvider>
-            <GestureHandlerRootView style={{ flex: 1 }}>
-              <RootLayoutNav />
-            </GestureHandlerRootView>
-          </FreePlayProvider>
-        </CompetitionProvider>
-      </PlayerAuthContext>
-    </QueryClientProvider>
+    <DatabaseProvider database={database}>
+      <QueryClientProvider client={queryClient}>
+        <PlayerAuthContext>
+          <CompetitionProvider>
+            <FreePlayProvider>
+              <GestureHandlerRootView style={{ flex: 1 }}>
+                <RootLayoutNav />
+              </GestureHandlerRootView>
+            </FreePlayProvider>
+          </CompetitionProvider>
+        </PlayerAuthContext>
+      </QueryClientProvider>
+    </DatabaseProvider>
   );
 }

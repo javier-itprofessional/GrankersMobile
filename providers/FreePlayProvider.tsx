@@ -1,54 +1,42 @@
 import createContextHook from '@nkzw/create-context-hook';
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import { Q } from '@nozbe/watermelondb';
 import type { Player, PlayerScores, HoleScore } from '../types/game';
-import { unlinkDeviceAndRemovePlayer, fetchCourseHoleHandicaps } from '@/config/firebase';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getCourseRouteData } from '@/services/course-service';
+import { syncEngine } from '@/services/sync-engine';
+import { database, Round, RoundPlayer, HoleScore as HoleScoreModel } from '@/database';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const generateHolePars = (): number[] => {
   const pars: number[] = [];
   let totalPar = 0;
-  
   for (let i = 0; i < 18; i++) {
     let par: number;
     const remaining = 18 - i;
     const maxAvg = Math.floor((72 - totalPar) / remaining);
     const minAvg = Math.ceil((72 - totalPar) / remaining);
-    
-    if (maxAvg >= 5) {
-      par = Math.random() > 0.5 ? 5 : 4;
-    } else if (minAvg <= 3) {
-      par = Math.random() > 0.5 ? 3 : 4;
-    } else {
-      par = 4;
-    }
-    
+    if (maxAvg >= 5) par = Math.random() > 0.5 ? 5 : 4;
+    else if (minAvg <= 3) par = Math.random() > 0.5 ? 3 : 4;
+    else par = 4;
     par = Math.max(3, Math.min(5, par));
-    
-    if (totalPar + par + (remaining - 1) * 3 > 72) {
-      par = 3;
-    }
-    if (totalPar + par + (remaining - 1) * 5 < 72) {
-      par = 5;
-    }
-    
+    if (totalPar + par + (remaining - 1) * 3 > 72) par = 3;
+    if (totalPar + par + (remaining - 1) * 5 < 72) par = 5;
     pars.push(par);
     totalPar += par;
   }
-  
   const diff = 72 - totalPar;
   if (diff !== 0) {
     for (let i = 0; i < Math.abs(diff); i++) {
       const idx = Math.floor(Math.random() * 18);
-      if (diff > 0 && pars[idx] < 5) {
-        pars[idx]++;
-      } else if (diff < 0 && pars[idx] > 3) {
-        pars[idx]--;
-      }
+      if (diff > 0 && pars[idx] < 5) pars[idx]++;
+      else if (diff < 0 && pars[idx] > 3) pars[idx]--;
     }
   }
-  
   return pars;
 };
+
+// ─── Provider ─────────────────────────────────────────────────────────────────
 
 export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
   const [players, setPlayers] = useState<Player[]>([]);
@@ -61,234 +49,306 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
   const [gameName, setGameName] = useState<string>('');
   const [groupName, setGroupName] = useState<string>('');
   const [devicePlayerId, setDevicePlayerId] = useState<string>('');
+  const [holeHandicaps, setHoleHandicaps] = useState<number[]>(new Array(18).fill(0));
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
   const [currentScreen, setCurrentScreen] = useState<string>('/game/scoring');
-  const [holeHandicaps, setHoleHandicaps] = useState<number[]>(new Array(18).fill(0));
+  const [activeRoundId, setActiveRoundId] = useState<string | null>(null);
+
+  // ─── Lifecycle: sync engine ────────────────────────────────────────────────
 
   useEffect(() => {
-    restoreSession();
+    syncEngine.start();
+    return () => { syncEngine.stop(); };
   }, []);
 
-  const restoreSession = async () => {
-    try {
-      console.log('[FreePlay] Attempting to restore session...');
-      const sessionData = await AsyncStorage.getItem('freePlaySession');
-      
-      if (sessionData) {
-        const session = JSON.parse(sessionData);
-        console.log('[FreePlay] Session found:', session);
-        
-        setPlayers(session.players || []);
-        setCurrentHole(session.currentHole || 1);
-        setHolePars(session.holePars || generateHolePars());
-        setGameStarted(session.gameStarted || false);
-        setCourseName(session.courseName || '');
-        setRouteName(session.routeName || '');
-        setGameName(session.gameName || '');
-        setGroupName(session.groupName || '');
-        setDevicePlayerId(session.devicePlayerId || '');
-        setCurrentScreen(session.currentScreen || '/game/scoring');
+  // ─── Carga inicial desde WatermelonDB ───────────────────────────────────────
 
-        if (session.holeHandicaps && Array.isArray(session.holeHandicaps)) {
-          console.log('[FreePlay] Restoring hole handicaps from session:', session.holeHandicaps);
-          setHoleHandicaps(session.holeHandicaps);
-        } else if (session.courseName && session.routeName) {
-          console.log('[FreePlay] Re-fetching hole handicaps on restore:', session.courseName, session.routeName);
-          fetchCourseHoleHandicaps(session.courseName, session.routeName).then((hcps) => {
-            console.log('[FreePlay] Hole handicaps restored:', hcps);
-            setHoleHandicaps(hcps);
-          }).catch((err) => console.error('[FreePlay] Error restoring handicaps:', err));
-        }
+  useEffect(() => {
+    const load = async () => {
+      const activeRounds = await database
+        .get<Round>('rounds')
+        .query(Q.and(Q.where('mode', 'free-play'), Q.where('status', Q.notEq('finished'))))
+        .fetch();
 
-        if (session.playerScoresMap) {
-          const scoresMap = new Map<string, PlayerScores>();
-          Object.entries(session.playerScoresMap).forEach(([key, value]) => {
-            scoresMap.set(key, value as PlayerScores);
+      if (activeRounds.length > 0) {
+        const round = activeRounds[0];
+        setActiveRoundId(round.id);
+
+        const roundPlayerRecords = await database
+          .get<RoundPlayer>('round_players')
+          .query(Q.where('round_id', round.id))
+          .fetch();
+
+        const restoredPlayers: Player[] = roundPlayerRecords.map((p) => ({
+          id: p.playerExternalId,
+          nombre: p.nombre,
+          apellido: p.apellido,
+          licencia: p.licencia ?? undefined,
+          handicap: p.handicap ?? undefined,
+          isDevice: p.isLocalDevice,
+        }));
+
+        const localDevice = roundPlayerRecords.find((p) => p.isLocalDevice);
+
+        const holeScores = await database
+          .get<HoleScoreModel>('hole_scores')
+          .query(Q.where('round_id', round.id))
+          .fetch();
+
+        const scoresMap = new Map<string, PlayerScores>();
+        for (const player of restoredPlayers) {
+          const playerHoles = holeScores
+            .filter((h) => h.playerExternalId === player.id)
+            .sort((a, b) => a.holeNumber - b.holeNumber);
+          const scores: HoleScore[] = playerHoles.map((h) => ({
+            holeNumber: h.holeNumber,
+            par: h.par,
+            score: h.score,
+            saved: h.saved,
+          }));
+          const savedScores = scores.filter((s) => s.saved);
+          scoresMap.set(player.id, {
+            playerId: player.id,
+            scores,
+            totalScore: savedScores.reduce((sum, s) => sum + s.score, 0),
+            totalPar: savedScores.reduce((sum, s) => sum + s.par, 0),
           });
-          setPlayerScoresMap(scoresMap);
         }
-        
-        console.log('[FreePlay] ✅ Session restored successfully');
-      } else {
-        console.log('[FreePlay] No session found');
+
+        setPlayers(restoredPlayers);
+        setCurrentHole(round.currentHole);
+        setHolePars(round.holeParsArray);
+        setHoleHandicaps(round.holeHandicapsArray);
+        setCourseName(round.courseName);
+        setRouteName(round.routeName);
+        setGameName(round.gameName ?? '');
+        setGroupName(round.groupName ?? '');
+        setDevicePlayerId(localDevice?.playerExternalId ?? '');
+        setCurrentScreen(round.currentScreen ?? '/game/scoring');
+        setPlayerScoresMap(scoresMap);
+        setGameStarted(true);
       }
-    } catch (error) {
-      console.error('[FreePlay] ❌ Error restoring session:', error);
-    } finally {
+
       setIsLoaded(true);
-    }
-  };
+    };
 
-  const saveSession = useCallback(async (data: any) => {
-    try {
-      console.log('[FreePlay] Saving session...');
-      await AsyncStorage.setItem('freePlaySession', JSON.stringify(data));
-      console.log('[FreePlay] ✅ Session saved successfully');
-    } catch (error) {
-      console.error('[FreePlay] ❌ Error saving session:', error);
-    }
+    load();
   }, []);
 
-  const clearSession = useCallback(async () => {
-    try {
-      console.log('[FreePlay] Clearing session...');
-      await AsyncStorage.removeItem('freePlaySession');
-      console.log('[FreePlay] ✅ Session cleared successfully');
-    } catch (error) {
-      console.error('[FreePlay] ❌ Error clearing session:', error);
-    }
-  }, []);
+  // ─── Persistir currentHole y currentScreen cuando cambian ──────────────────
+
+  useEffect(() => {
+    if (!activeRoundId || !isLoaded || !gameStarted) return;
+    database.write(async () => {
+      const round = await database.get<Round>('rounds').find(activeRoundId);
+      await round.update((r) => {
+        r.currentHole = currentHole;
+        r.currentScreen = currentScreen;
+      });
+    });
+  }, [currentHole, currentScreen, activeRoundId, isLoaded, gameStarted]);
+
+  // ─── Acciones ───────────────────────────────────────────────────────────────
 
   const setCourseInfo = useCallback((course: string, route: string) => {
-    console.log('[FreePlay] Setting course info:', { course, route });
     setCourseName(course);
     setRouteName(route);
-
     if (course && route) {
-      fetchCourseHoleHandicaps(course, route).then((hcps) => {
-        console.log('[FreePlay] Hole handicaps loaded:', hcps);
-        setHoleHandicaps(hcps);
-      }).catch((err) => console.error('[FreePlay] Error fetching handicaps:', err));
+      getCourseRouteData(course, route)
+        .then((data) => {
+          if (data) setHoleHandicaps(data.holes.map((h) => h.handicap));
+        })
+        .catch(() => {});
     }
   }, []);
 
   const setGameInfo = useCallback((game: string, group: string) => {
-    console.log('[FreePlay] Setting game info:', { game, group });
     setGameName(game);
     setGroupName(group);
   }, []);
 
   const setDevicePlayer = useCallback((playerId: string) => {
-    console.log('[FreePlay] Setting device player ID:', playerId);
     setDevicePlayerId(playerId);
   }, []);
 
-  const startFreePlay = useCallback((playersList: Player[]) => {
-    console.log('[FreePlay] Starting free play with players:', playersList);
-    setPlayers(playersList);
-    setGameStarted(true);
-    setCurrentHole(1);
-    const pars = generateHolePars();
-    setHolePars(pars);
-    
-    const scoresMap = new Map<string, PlayerScores>();
-    playersList.forEach((player) => {
-      const scores: HoleScore[] = [];
-      for (let i = 1; i <= 18; i++) {
-        scores.push({
-          holeNumber: i,
-          par: pars[i - 1],
-          score: pars[i - 1],
-          saved: false,
+  const startFreePlay = useCallback(async (playersList: Player[]) => {
+    // Obtener pars y handicaps reales del campo (o fallback aleatorio)
+    let pars = generateHolePars();
+    let hcps = holeHandicaps;
+    if (courseName && routeName) {
+      const courseData = await getCourseRouteData(courseName, routeName).catch(() => null);
+      if (courseData) {
+        pars = courseData.holes.map((h) => h.par);
+        hcps = courseData.holes.map((h) => h.handicap);
+        setHoleHandicaps(hcps);
+      }
+    }
+
+    let roundId = '';
+    await database.write(async () => {
+      // Borrar partidas libres previas sin terminar
+      const old = await database
+        .get<Round>('rounds')
+        .query(Q.and(Q.where('mode', 'free-play'), Q.where('status', Q.notEq('finished'))))
+        .fetch();
+      for (const r of old) {
+        const oldScores = await database.get<HoleScoreModel>('hole_scores').query(Q.where('round_id', r.id)).fetch();
+        for (const s of oldScores) await s.destroyPermanently();
+        const oldPlayers = await database.get<RoundPlayer>('round_players').query(Q.where('round_id', r.id)).fetch();
+        for (const p of oldPlayers) await p.destroyPermanently();
+        await r.destroyPermanently();
+      }
+
+      const round = await database.get<Round>('rounds').create((r) => {
+        r.mode = 'free-play';
+        r.courseName = courseName;
+        r.routeName = routeName;
+        r.currentHole = 1;
+        r.status = 'in_progress';
+        r.scoringMode = 'all';
+        r.visiblePlayerIds = '[]';
+        r.holePars = JSON.stringify(pars);
+        r.holeHandicaps = JSON.stringify(hcps);
+        r.gameName = gameName;
+        r.groupName = groupName;
+        r.currentScreen = '/game/scoring';
+        r.createdAt = Date.now();
+      });
+      roundId = round.id;
+
+      for (const player of playersList) {
+        await database.get<RoundPlayer>('round_players').create((rp) => {
+          rp.roundId = round.id;
+          rp.playerExternalId = player.id;
+          rp.nombre = player.nombre;
+          rp.apellido = player.apellido;
+          rp.licencia = player.licencia ?? null;
+          rp.handicap = typeof player.handicap === 'number' ? player.handicap : null;
+          rp.isLocalDevice = player.isDevice ?? false;
+          rp.estado = 'pendiente';
         });
       }
+
+      for (const player of playersList) {
+        for (let i = 1; i <= 18; i++) {
+          await database.get<HoleScoreModel>('hole_scores').create((hs) => {
+            hs.roundId = round.id;
+            hs.playerExternalId = player.id;
+            hs.holeNumber = i;
+            hs.par = pars[i - 1];
+            hs.handicap = hcps[i - 1] ?? 0;
+            hs.score = pars[i - 1];
+            hs.saved = false;
+          });
+        }
+      }
+    });
+
+    const scoresMap = new Map<string, PlayerScores>();
+    playersList.forEach((player) => {
       scoresMap.set(player.id, {
         playerId: player.id,
-        scores,
+        scores: Array.from({ length: 18 }, (_, i) => ({
+          holeNumber: i + 1,
+          par: pars[i],
+          score: pars[i],
+          saved: false,
+        })),
         totalScore: 0,
         totalPar: 72,
       });
     });
-    console.log('[FreePlay] Score map created for players:', Array.from(scoresMap.keys()));
-    setPlayerScoresMap(scoresMap);
-  }, []);
 
-  useEffect(() => {
-    if (gameStarted && isLoaded) {
-      const scoresMapObject: { [key: string]: PlayerScores } = {};
-      playerScoresMap.forEach((value, key) => {
-        scoresMapObject[key] = value;
-      });
-      
-      const sessionData = {
-        players,
-        currentHole,
-        holePars,
-        holeHandicaps,
-        playerScoresMap: scoresMapObject,
-        gameStarted,
-        courseName,
-        routeName,
-        gameName,
-        groupName,
-        devicePlayerId,
-        currentScreen,
-      };
-      
-      saveSession(sessionData);
-    }
-  }, [players, currentHole, holePars, holeHandicaps, playerScoresMap, gameStarted, courseName, routeName, gameName, groupName, devicePlayerId, currentScreen, isLoaded, saveSession]);
+    setPlayers(playersList);
+    setCurrentHole(1);
+    setHolePars(pars);
+    setPlayerScoresMap(scoresMap);
+    setGameStarted(true);
+    setActiveRoundId(roundId);
+
+    syncEngine.record('ROUND_STARTED', { round_id: roundId, mode: 'free-play' }, roundId).catch(() => {});
+  }, [courseName, routeName, gameName, groupName, holeHandicaps]);
 
   const updateScore = useCallback((playerId: string, holeNumber: number, newScore: number) => {
-    console.log('[FreePlay] Updating score:', { playerId, holeNumber, newScore });
+    // Solo actualiza memoria — se persiste al guardar el hoyo
     setPlayerScoresMap((prev) => {
-      const newMap = new Map(prev);
-      const playerScores = newMap.get(playerId);
-      if (playerScores) {
-        const updatedScores = playerScores.scores.map((score) =>
-          score.holeNumber === holeNumber ? { ...score, score: newScore } : score
-        );
-        newMap.set(playerId, {
-          ...playerScores,
-          scores: updatedScores,
+      const next = new Map(prev);
+      const ps = next.get(playerId);
+      if (ps) {
+        next.set(playerId, {
+          ...ps,
+          scores: ps.scores.map((s) => s.holeNumber === holeNumber ? { ...s, score: newScore } : s),
         });
       }
-      return newMap;
+      return next;
     });
   }, []);
 
-  const saveHole = useCallback((holeNumber: number) => {
-    console.log('[FreePlay] Saving hole:', holeNumber);
-    
+  const saveHole = useCallback(async (holeNumber: number) => {
+    if (!activeRoundId) return;
+
+    const savedScores: Array<{ playerId: string; score: number; par: number; handicap: number }> = [];
+
+    await database.write(async () => {
+      const dbScores = await database
+        .get<HoleScoreModel>('hole_scores')
+        .query(Q.and(Q.where('round_id', activeRoundId), Q.where('hole_number', holeNumber)))
+        .fetch();
+
+      for (const dbScore of dbScores) {
+        const inMemory = playerScoresMap.get(dbScore.playerExternalId)?.scores.find((s) => s.holeNumber === holeNumber);
+        if (inMemory) {
+          await dbScore.update((r) => {
+            r.score = inMemory.score;
+            r.saved = true;
+            r.savedAt = Date.now();
+          });
+          savedScores.push({
+            playerId: dbScore.playerExternalId,
+            score: inMemory.score,
+            par: dbScore.par,
+            handicap: dbScore.handicap,
+          });
+        }
+      }
+    });
+
+    for (const s of savedScores) {
+      syncEngine.record(
+        'HOLE_SAVED',
+        { round_id: activeRoundId, player_id: s.playerId, hole_number: holeNumber, score: s.score, par: s.par, handicap: s.handicap },
+        activeRoundId
+      ).catch(() => {});
+    }
+
     setPlayerScoresMap((prev) => {
-      const newMap = new Map(prev);
-      newMap.forEach((playerScores, playerId) => {
-        const updatedScores = playerScores.scores.map((score) =>
-          score.holeNumber === holeNumber ? { ...score, saved: true } : score
-        );
-        const savedScores = updatedScores.filter((s) => s.saved);
-        const total = savedScores.reduce((sum, s) => sum + s.score, 0);
-        const totalParPlayed = savedScores.reduce((sum, s) => sum + s.par, 0);
-        newMap.set(playerId, {
-          ...playerScores,
+      const next = new Map(prev);
+      next.forEach((ps, playerId) => {
+        const updatedScores = ps.scores.map((s) => s.holeNumber === holeNumber ? { ...s, saved: true } : s);
+        const saved = updatedScores.filter((s) => s.saved);
+        next.set(playerId, {
+          ...ps,
           scores: updatedScores,
-          totalScore: total,
-          totalPar: totalParPlayed,
+          totalScore: saved.reduce((sum, s) => sum + s.score, 0),
+          totalPar: saved.reduce((sum, s) => sum + s.par, 0),
         });
       });
-      return newMap;
+      return next;
     });
-  }, []);
+  }, [activeRoundId, playerScoresMap]);
 
-  const goToNextHole = useCallback(() => {
-    if (currentHole < 18) {
-      setCurrentHole((prev) => prev + 1);
-    }
-  }, [currentHole]);
-
-  const goToPreviousHole = useCallback(() => {
-    if (currentHole > 1) {
-      setCurrentHole((prev) => prev - 1);
-    }
-  }, [currentHole]);
-
-  const goToHole = useCallback((holeNumber: number) => {
-    if (holeNumber >= 1 && holeNumber <= 18) {
-      setCurrentHole(holeNumber);
-    }
-  }, []);
+  const goToNextHole = useCallback(() => setCurrentHole((h) => Math.min(h + 1, 18)), []);
+  const goToPreviousHole = useCallback(() => setCurrentHole((h) => Math.max(h - 1, 1)), []);
+  const goToHole = useCallback((n: number) => { if (n >= 1 && n <= 18) setCurrentHole(n); }, []);
 
   const isHoleSaved = useCallback((holeNumber: number): boolean => {
-    const firstPlayer = Array.from(playerScoresMap.values())[0];
-    if (!firstPlayer) return false;
-    const hole = firstPlayer.scores.find((s) => s.holeNumber === holeNumber);
-    return hole?.saved || false;
+    const first = Array.from(playerScoresMap.values())[0];
+    return first?.scores.find((s) => s.holeNumber === holeNumber)?.saved ?? false;
   }, [playerScoresMap]);
 
   const allHolesSaved = useMemo(() => {
-    if (playerScoresMap.size === 0) return false;
-    const firstPlayer = Array.from(playerScoresMap.values())[0];
-    return firstPlayer.scores.every((s) => s.saved);
+    const first = Array.from(playerScoresMap.values())[0];
+    return !!first && first.scores.every((s) => s.saved);
   }, [playerScoresMap]);
 
   const leaderboard = useMemo(() => {
@@ -297,57 +357,33 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
         const scores = playerScoresMap.get(player.id);
         return {
           player,
-          totalScore: scores?.totalScore || 0,
-          totalPar: scores?.totalPar || 72,
-          score: (scores?.totalScore || 0) - (scores?.totalPar || 72),
-          holesCompleted: scores?.scores.filter((s) => s.saved).length || 0,
+          totalScore: scores?.totalScore ?? 0,
+          totalPar: scores?.totalPar ?? 72,
+          score: (scores?.totalScore ?? 0) - (scores?.totalPar ?? 72),
+          holesCompleted: scores?.scores.filter((s) => s.saved).length ?? 0,
         };
       })
       .sort((a, b) => a.totalScore - b.totalScore);
   }, [players, playerScoresMap]);
 
   const resetFreePlay = useCallback(async () => {
-    console.log('[FreePlay] Resetting free play...');
-    
-    try {
-      if (courseName && routeName && gameName && groupName && devicePlayerId) {
-        console.log('[FreePlay] Attempting to unlink device and remove player from Firebase...');
-        console.log('[FreePlay] Course:', courseName);
-        console.log('[FreePlay] Route:', routeName);
-        console.log('[FreePlay] Game:', gameName);
-        console.log('[FreePlay] Group:', groupName);
-        console.log('[FreePlay] Device Player ID:', devicePlayerId);
-        
-        const playerKey = `jugador_${String(devicePlayerId).padStart(2, '0')}`;
-        console.log('[FreePlay] Player Key to remove:', playerKey);
-        
-        const result = await unlinkDeviceAndRemovePlayer(
-          courseName,
-          routeName,
-          gameName,
-          groupName,
-          playerKey
-        );
-        
-        if (result.shouldDeleteGame) {
-          console.log('[FreePlay] ✅ Game was deleted from Firebase (no more linked devices)');
-        } else {
-          console.log('[FreePlay] ✅ Player removed from Firebase (other players still in game)');
-        }
-      } else {
-        console.log('[FreePlay] ⚠️ Missing game info, skipping Firebase cleanup');
-        console.log('[FreePlay] courseName:', courseName);
-        console.log('[FreePlay] routeName:', routeName);
-        console.log('[FreePlay] gameName:', gameName);
-        console.log('[FreePlay] groupName:', groupName);
-        console.log('[FreePlay] devicePlayerId:', devicePlayerId);
-      }
-    } catch (error) {
-      console.error('[FreePlay] ❌ Error removing player from Firebase:', error);
+    if (activeRoundId) {
+      await syncEngine.record('ROUND_FINISHED', { round_id: activeRoundId }, activeRoundId).catch(() => {});
+      await syncEngine.flush().catch(() => {});
     }
-    
-    await clearSession();
-    
+
+    // Limpiar WatermelonDB
+    if (activeRoundId) {
+      await database.write(async () => {
+        const holeScores = await database.get<HoleScoreModel>('hole_scores').query(Q.where('round_id', activeRoundId)).fetch();
+        for (const hs of holeScores) await hs.destroyPermanently();
+        const roundPlayers = await database.get<RoundPlayer>('round_players').query(Q.where('round_id', activeRoundId)).fetch();
+        for (const rp of roundPlayers) await rp.destroyPermanently();
+        const round = await database.get<Round>('rounds').find(activeRoundId);
+        await round.destroyPermanently();
+      });
+    }
+
     setPlayers([]);
     setCurrentHole(1);
     setHolePars(generateHolePars());
@@ -359,7 +395,8 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
     setGroupName('');
     setDevicePlayerId('');
     setCurrentScreen('/game/scoring');
-  }, [courseName, routeName, gameName, groupName, devicePlayerId, clearSession]);
+    setActiveRoundId(null);
+  }, [courseName, routeName, gameName, groupName, devicePlayerId, activeRoundId]);
 
   const updateCurrentScreen = useCallback((screen: string) => {
     setCurrentScreen(screen);
@@ -377,6 +414,7 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
     gameName,
     groupName,
     devicePlayerId,
+    activeRoundId,
     isLoaded,
     currentScreen,
     setCourseInfo,

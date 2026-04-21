@@ -3,7 +3,7 @@ import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { Users, Check, WifiOff, Square, CheckSquare, UserCheck, UsersRound } from 'lucide-react-native';
 import { useState, useEffect, useMemo } from 'react';
 import Colors from '../../constants/colors';
-import { subscribeToCompetitionPlayers, updatePlayerConnectionStatus } from '@/config/firebase';
+import { subscribeToCompetitionPlayers, updatePlayerConnectionStatus } from '@/services/game-service';
 import { useCompetition } from '@/providers/CompetitionProvider';
 
 interface PlayerStatus {
@@ -49,23 +49,8 @@ export default function CompetitionWaitingPlayersScreen() {
 
     console.log('[CompetitionWaiting] Subscribing to players for code:', codigoGrupo);
 
-    const unsubscribe = subscribeToCompetitionPlayers(codigoGrupo, (data) => {
-      console.log('[CompetitionWaiting] Players data received:', data);
-
-      const playersList: PlayerStatus[] = [];
-
-      players.forEach((player: { id: string; nombre: string; apellido: string }) => {
-        const fbPlayer = data[player.id];
-        playersList.push({
-          id: player.id,
-          nombre: player.nombre,
-          apellido: player.apellido,
-          deviceId: fbPlayer?.deviceId,
-          estado: fbPlayer?.estado,
-        });
-      });
-
-      console.log('[CompetitionWaiting] Processed players:', playersList);
+    const unsubscribe = subscribeToCompetitionPlayers(codigoGrupo, players, (playersList) => {
+      console.log('[CompetitionWaiting] Players data received:', playersList);
       setPlayersStatus(playersList);
 
       setOfflinePlayers(prev => {
@@ -80,7 +65,7 @@ export default function CompetitionWaitingPlayersScreen() {
     });
 
     return () => {
-      console.log('[CompetitionWaiting] Unsubscribing from Firebase listener');
+      console.log('[CompetitionWaiting] Unsubscribing from WebSocket listener');
       unsubscribe();
     };
   }, [codigoGrupo, players]);
