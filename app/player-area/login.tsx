@@ -3,69 +3,74 @@ import { Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Mail, ChevronRight } from 'lucide-react-native';
+import { Mail, ChevronRight, CheckCircle } from 'lucide-react-native';
 import Colors from '@/constants/colors';
-import { usePlayerAuth, PlayerSession } from '@/providers/PlayerAuthProvider';
+import { usePlayerAuth } from '@/providers/PlayerAuthProvider';
+import { loginWithGoogle, requestMagicLink } from '@/services/auth';
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { saveSession } = usePlayerAuth();
+  const { reloadSession } = usePlayerAuth();
   const [email, setEmail] = useState<string>('');
+  const [emailSent, setEmailSent] = useState<boolean>(false);
 
   const googleLoginMutation = useMutation({
     mutationFn: async () => {
-      console.log('[Login] Google login pressed');
-      const mockSession: PlayerSession = {
-        id: `google-${Date.now()}`,
-        name: 'Jugador Google',
-        email: 'jugador@gmail.com',
-        country: 'España',
-        authMethod: 'google',
-        createdAt: new Date().toISOString(),
-      };
-      await saveSession(mockSession);
-      return mockSession;
+      await loginWithGoogle();
+      await reloadSession();
     },
     onSuccess: () => {
-      console.log('[Login] Google login success, navigating to player area');
       router.replace('/player-area');
     },
     onError: (error: Error) => {
       console.error('[Login] Google login error:', error);
-      Alert.alert('Error', 'No se pudo iniciar sesión con Google');
+      Alert.alert('Error', error.message || 'No se pudo iniciar sesión con Google');
     },
   });
 
-  const emailLoginMutation = useMutation({
+  const magicLinkMutation = useMutation({
     mutationFn: async () => {
-      if (!email.trim()) {
-        throw new Error('Por favor, introduce tu correo electrónico');
-      }
+      if (!email.trim()) throw new Error('Por favor, introduce tu correo electrónico');
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email.trim())) {
-        throw new Error('Por favor, introduce un correo electrónico válido');
-      }
-      console.log('[Login] Email login with:', email);
-      const mockSession: PlayerSession = {
-        id: `email-${Date.now()}`,
-        name: email.split('@')[0],
-        email: email.trim(),
-        country: '',
-        authMethod: 'email',
-        createdAt: new Date().toISOString(),
-      };
-      await saveSession(mockSession);
-      return mockSession;
+      if (!emailRegex.test(email.trim())) throw new Error('Por favor, introduce un correo electrónico válido');
+      await requestMagicLink(email.trim());
     },
     onSuccess: () => {
-      console.log('[Login] Email login success');
-      router.replace('/player-area');
+      setEmailSent(true);
     },
     onError: (error: Error) => {
       Alert.alert('Error', error.message);
     },
   });
+
+  if (emailSent) {
+    return (
+      <View style={styles.container}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={[styles.centeredContent, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 40 }]}>
+          <View style={styles.successIcon}>
+            <CheckCircle size={48} color={Colors.golf.primary} strokeWidth={1.5} />
+          </View>
+          <Text style={styles.successTitle}>Revisa tu email</Text>
+          <Text style={styles.successSubtitle}>
+            Hemos enviado un enlace de acceso a{'\n'}
+            <Text style={styles.emailHighlight}>{email}</Text>
+          </Text>
+          <Text style={styles.successHint}>
+            Haz clic en el enlace del email para iniciar sesión. El enlace expira en unos minutos.
+          </Text>
+          <TouchableOpacity
+            style={styles.resendButton}
+            onPress={() => setEmailSent(false)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.resendButtonText}>Volver e introducir otro email</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -132,14 +137,14 @@ export default function LoginScreen() {
                 />
               </View>
               <TouchableOpacity
-                style={[styles.emailLoginButton, (!email.trim()) && styles.buttonDisabled]}
-                onPress={() => emailLoginMutation.mutate()}
-                disabled={emailLoginMutation.isPending || !email.trim()}
+                style={[styles.emailLoginButton, !email.trim() && styles.buttonDisabled]}
+                onPress={() => magicLinkMutation.mutate()}
+                disabled={magicLinkMutation.isPending || !email.trim()}
                 activeOpacity={0.8}
                 testID="email-login-button"
               >
                 <Text style={styles.emailLoginButtonText}>
-                  {emailLoginMutation.isPending ? 'Iniciando sesión...' : 'Iniciar sesión'}
+                  {magicLinkMutation.isPending ? 'Enviando enlace...' : 'Enviar enlace de acceso'}
                 </Text>
                 <ChevronRight size={18} color="#FFFFFF" />
               </TouchableOpacity>
@@ -182,6 +187,52 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 24,
     flexGrow: 1,
+  },
+  centeredContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    gap: 16,
+  },
+  successIcon: {
+    marginBottom: 8,
+  },
+  successTitle: {
+    fontSize: 26,
+    fontWeight: '700' as const,
+    color: Colors.golf.text,
+    textAlign: 'center',
+  },
+  successSubtitle: {
+    fontSize: 15,
+    fontWeight: '400' as const,
+    color: Colors.golf.textLight,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  emailHighlight: {
+    fontWeight: '600' as const,
+    color: Colors.golf.text,
+  },
+  successHint: {
+    fontSize: 13,
+    fontWeight: '400' as const,
+    color: Colors.golf.textLight,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  resendButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  resendButtonText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: Colors.golf.primary,
+    textDecorationLine: 'underline',
   },
   topSection: {
     alignItems: 'center',

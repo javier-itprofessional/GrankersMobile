@@ -15,7 +15,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.GrankersMobile.golf",
+      "bundleIdentifier": "com.grankers.mobile",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "entitlements": {
         "com": {
           "apple": {
@@ -34,7 +35,7 @@
         "backgroundColor": "#ffffff"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "app.GrankersMobile.golf"
+      "package": "com.grankers.mobile"
     },
     "web": {
       "bundler": "metro",
@@ -44,10 +45,24 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-secure-store",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.1018215047600-pdti2059584s4kluatnjj8vv9p6rjh3s"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "66b650b4-7aab-4350-9ef5-93c8ee7238ed"
+      }
+    },
+    "owner": "javiergrankers"
   }
 }
