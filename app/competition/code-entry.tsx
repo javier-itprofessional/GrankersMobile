@@ -3,7 +3,7 @@ import { useState, useRef } from 'react';
 import { useRouter, Stack } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import Colors from '../../constants/colors';
-import { fetchCompetitionData } from '../../config/firebase';
+import { fetchCompetitionData } from '@/services/game-service';
 import { CheckCircle } from 'lucide-react-native';
 
 export default function CodeEntryScreen() {

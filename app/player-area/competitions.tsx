@@ -4,10 +4,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Calendar, ClipboardList, ChevronRight, Trophy, Clock, MapPin, Navigation } from 'lucide-react-native';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import Colors from '@/constants/colors';
-import { fetchProximaCompeticion, fetchCompetitionData, linkDeviceToCompetitionPlayer } from '@/config/firebase';
+import { fetchProximaCompeticion, fetchCompetitionData, linkDeviceToCompetitionPlayer } from '@/services/game-service';
 import * as Application from 'expo-application';
 import { useCompetition } from '@/providers/CompetitionProvider';
-import type { ProximaCompeticion } from '@/config/firebase';
+import type { ProximaCompeticion } from '@/services/game-service';
 
 interface MenuItemProps {
   icon: React.ReactNode;

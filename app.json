@@ -17,6 +17,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.grankers.mobile",
       "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
       "entitlements": {
         "com": {
           "apple": {

@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import * as Application from 'expo-application';
 import Colors from '../../constants/colors';
 import { useCompetition } from '../../providers/CompetitionProvider';
-import { linkDeviceToCompetitionPlayer, subscribeToCompetitionPlayers } from '@/config/firebase';
+import { linkDeviceToCompetitionPlayer, subscribeToCompetitionPlayers } from '@/services/game-service';
 
 export default function CompetitionSelectPlayerScreen() {
   const router = useRouter();
@@ -144,22 +144,10 @@ export default function CompetitionSelectPlayerScreen() {
 
     console.log('[CompetitionSelectPlayer] Subscribing to real-time player updates for code:', codigoGrupo);
 
-    const unsubscribe = subscribeToCompetitionPlayers(codigoGrupo, (data) => {
-      console.log('[CompetitionSelectPlayer] Real-time update received:', data);
+    const unsubscribe = subscribeToCompetitionPlayers(codigoGrupo, players, (statusList) => {
+      console.log('[CompetitionSelectPlayer] Real-time update received:', statusList);
 
-      const unassigned: any[] = [];
-
-      players.forEach((player: any) => {
-        const fbPlayer = data[player.id];
-        const hasDevice = fbPlayer?.deviceId;
-        const isOffline = fbPlayer?.estado === 'offline';
-        if (!hasDevice && !isOffline) {
-          unassigned.push(player);
-          console.log(`[CompetitionSelectPlayer] Player ${player.id} is unassigned and online`);
-        } else {
-          console.log(`[CompetitionSelectPlayer] Player ${player.id} excluded (deviceId: ${hasDevice}, offline: ${isOffline})`);
-        }
-      });
+      const unassigned = statusList.filter((p) => !p.deviceId && p.estado !== 'offline');
 
       console.log('[CompetitionSelectPlayer] Unassigned players:', unassigned.length);
       setUnassignedPlayers(unassigned);

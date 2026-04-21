@@ -20,8 +20,8 @@ import { useCompetition } from '../providers/CompetitionProvider';
 import { useFreePlay } from '../providers/FreePlayProvider';
 import { usePlayerAuth } from '../providers/PlayerAuthProvider';
 import { loginWithGoogle } from '../services/auth';
-import { findCompetitionByDeviceId, getPlayerHoleScores } from '../config/firebase';
-import type { FoundCompetitionSession } from '../config/firebase';
+import { findCompetitionByDeviceId, getPlayerHoleScores } from '../services/game-service';
+import type { FoundCompetitionSession } from '../services/game-service';
 
 type Screen = 'landing' | 'menu';
 
