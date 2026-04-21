@@ -28,6 +28,7 @@ export default class Round extends Model {
   @text('nombre_competicion') nombreCompeticion!: string | null;
   @text('nombre_prueba') nombrePrueba!: string | null;
   @text('fecha') fecha!: string | null;
+  @text('tour_event_id') tourEventId!: string | null;  // FK -> tour_events.external_id
 
   // Free-play fields
   @text('game_name') gameName!: string | null;

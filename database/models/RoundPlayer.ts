@@ -14,6 +14,7 @@ export default class RoundPlayer extends Model {
   @text('apellido') apellido!: string;
   @text('licencia') licencia!: string | null;
   @field('handicap') handicap!: number | null;
+  @text('player_id') playerId!: string | null;          // FK -> players_cache.external_id
   @text('device_id') deviceId!: string | null;
   @field('is_local_device') isLocalDevice!: boolean;
   @text('estado') estado!: string;

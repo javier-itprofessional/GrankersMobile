@@ -16,6 +16,7 @@ export default class HoleScore extends Model {
   @field('score') score!: number;
   @field('saved') saved!: boolean;
   @field('saved_at') savedAt!: number | null;
+  @field('strokes_net') strokesNet!: number | null;
   @field('conflict_score_local') conflictScoreLocal!: number | null;
   @field('conflict_score_marcador') conflictScoreMarcador!: number | null;
 
