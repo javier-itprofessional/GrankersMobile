@@ -29,18 +29,19 @@ export interface HoleSavedPayload {
   round_id: string;
   player_id: string;
   hole_number: number;
-  score: number;
-  par: number;
-  handicap: number;
-  strokes_net?: number;
+  strokes: number;           // golpes brutos (era "score")
+  putts?: number;
+  penalties?: number;
+  fairway_hit?: boolean;
+  gir?: boolean;             // green in regulation
 }
 
 export interface ScoreAmendedPayload {
   round_id: string;
   player_id: string;
   hole_number: number;
-  old_score: number;
-  new_score: number;
+  strokes: number;           // nueva puntuación corregida
+  putts?: number;
   reason?: string;
 }
 
@@ -48,8 +49,8 @@ export interface PenaltyAddedPayload {
   round_id: string;
   player_id: string;
   hole_number: number;
-  penalty_strokes: number;
-  rule_reference?: string;  // e.g. "Rule 17.1"
+  penalty_type: string;      // e.g. "ob", "hazard", "unplayable"
+  strokes: number;           // golpes de penalización (era "penalty_strokes")
 }
 
 export interface PlayerReadyPayload {
@@ -59,18 +60,20 @@ export interface PlayerReadyPayload {
 
 export interface RoundStartedPayload {
   round_id: string;
-  competition_id?: string;
-  tour_event_id?: string;
+  course_id?: string;
+  tee_color?: string;
   mode: 'competition' | 'free-play';
+  players?: { player_uuid: string; handicap_index: number; tee_color?: string }[];
 }
 
 export interface RoundFinishedPayload {
   round_id: string;
+  total_strokes_by_player?: Record<string, number>;
 }
 
 export interface RoundSuspendedPayload {
   round_id: string;
-  reason?: string;          // weather | injury | darkness
+  reason?: string;           // weather | injury | darkness
 }
 
 export interface RoundResumedPayload {
@@ -79,35 +82,33 @@ export interface RoundResumedPayload {
 
 export interface ConcessionPayload {
   round_id: string;
-  player_id: string;
   hole_number: number;
+  conceder_player_id: string;  // jugador que concede (era "player_id")
 }
 
 export interface HoleResultPayload {
   round_id: string;
   hole_number: number;
-  winner_player_id?: string; // null = halved
+  winner_player_id?: string;   // undefined = halved
 }
 
 export interface NoteAddedPayload {
   round_id: string;
-  player_id?: string;
   hole_number?: number;
   text: string;
+  media_ref?: string;          // UUID v7 de un media_attachment asociado
 }
 
 export interface MediaAttachedPayload {
   round_id: string;
-  player_id?: string;
-  attachment_id: string;    // FK -> media_attachments
-  attachment_type: 'photo' | 'signature' | 'document';
+  media_ref: string;           // UUID v7 (era "attachment_id")
+  caption?: string;
 }
 
 export interface SignatureAddedPayload {
   round_id: string;
-  player_id: string;        // jugador que firma
-  signed_for_player_id: string; // jugador cuya tarjeta se firma (marker firma la tarjeta del jugador)
-  attachment_id: string;    // FK -> media_attachments
+  marker_player_id: string;    // jugador que firma (era "player_id")
+  media_ref: string;           // UUID v7 (era "attachment_id")
 }
 
 export type ActionPayload =

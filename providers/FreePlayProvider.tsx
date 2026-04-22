@@ -316,7 +316,7 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
     for (const s of savedScores) {
       syncEngine.record(
         'HOLE_SAVED',
-        { round_id: activeRoundId, player_id: s.playerId, hole_number: holeNumber, score: s.score, par: s.par, handicap: s.handicap },
+        { round_id: activeRoundId, player_id: s.playerId, hole_number: holeNumber, strokes: s.score },
         activeRoundId
       ).catch(() => {});
     }

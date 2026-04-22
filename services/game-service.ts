@@ -138,11 +138,11 @@ export function subscribeToCompetitionPlayers(
   );
 
   const unsubscribe = wsClient.on('player_status_changed', (payload) => {
-    const entry = playerMap.get(payload.player_id);
+    const entry = playerMap.get(payload.player_uuid);
     if (entry) {
       entry.estado = payload.status;
       if (payload.status === 'conectado') {
-        entry.deviceId = payload.player_id;
+        entry.deviceId = payload.player_uuid;
       }
     }
     callback(Array.from(playerMap.values()));

@@ -4,24 +4,19 @@ const WS_URL = process.env.EXPO_PUBLIC_WS_URL;
 
 // ─── Tipos de eventos recibidos del backend ───────────────────────────────────
 
+// Entrada del leaderboard tal como la envía el backend (REST + WS)
 export interface LeaderboardEntry {
-  player_id: string;
-  nombre: string;
-  apellido: string;
-  total_score: number;
-  total_par: number;
-  vs_par: number;
-  holes_completed: number;
-}
-
-export interface ScoreConfirmedEvent {
-  player_id: string;
-  hole_number: number;
-  score: number;
+  position: number;
+  player: { uuid: string; name: string; avatar_url?: string };
+  thru: number;           // hoyos completados
+  gross: number;          // golpes brutos totales
+  net: number;            // golpes netos
+  points: number;         // stableford points (si aplica)
+  status: 'active' | 'finished' | 'withdrawn' | 'dnf';
 }
 
 export interface PlayerStatusEvent {
-  player_id: string;
+  player_uuid: string;
   status: 'preparado' | 'conectado' | 'no_presentado' | 'pendiente';
 }
 
@@ -32,10 +27,10 @@ export type WsEventType =
   | 'round_finished';
 
 export type WsEventPayload = {
-  leaderboard_updated: { round_id: string; leaderboard: LeaderboardEntry[] };
-  score_confirmed: { round_id: string } & ScoreConfirmedEvent;
-  player_status_changed: { round_id: string } & PlayerStatusEvent;
-  round_finished: { round_id: string };
+  leaderboard_updated: { event_uuid: string; entries: LeaderboardEntry[] };
+  score_confirmed: { action_id: string; materialized: boolean };
+  player_status_changed: PlayerStatusEvent;
+  round_finished: { round_id: string; closed_at: string; by: 'last_player' | 'admin' };
 };
 
 type Listener<T extends WsEventType> = (payload: WsEventPayload[T]) => void;

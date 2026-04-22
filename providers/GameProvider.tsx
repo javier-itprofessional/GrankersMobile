@@ -230,7 +230,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
         const holeData = playerHoleScores.find((s) => s.holeNumber === holeNumber);
         await syncEngine.record(
           'HOLE_SAVED',
-          { round_id: roundId, player_id: playerId, hole_number: holeNumber, score, par: holeData?.par ?? 4, handicap: 0 },
+          { round_id: roundId, player_id: playerId, hole_number: holeNumber, strokes: score },
           roundId
         ).catch(() => {});
       }
