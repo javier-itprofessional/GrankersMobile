@@ -1,7 +1,8 @@
 # Grankers Mobile — Arquitectura Técnica
 
 > Guía de integración para el equipo de backend  
-> React Native (Expo) · WatermelonDB · WebSocket · 2026-04-21
+> React Native (Expo) · WatermelonDB · WebSocket  
+> Última actualización: 2026-04-22 — ver [Changelog](#changelog)
 
 ---
 
@@ -670,3 +671,59 @@ Estas tablas se rellenan mediante sync pull desde el backend. La app necesita en
 
 ### `leaderboard_cache`
 El leaderboard llega por WebSocket (`leaderboard_updated`). Si el WS no está disponible, la app usa el último snapshot local. El backend debería emitir este evento cada vez que cambia una puntuación.
+
+---
+
+## Changelog
+
+### 2026-04-22 — Alineación con `mobile-sync-spec.md`
+
+**Wire protocol (`services/sync-engine.ts`)**
+- `created_at` cambia de Unix ms (`number`) a ISO 8601 (`"2026-04-21T14:32:01.123Z"`)
+- Campo de error en `failed[]`: `error` → `reason`
+- Backoff de reintentos implementado: immediate → 5 s → 30 s → 2 min → 10 min
+- Errores de validación (`invalid_payload`, `unauthorized`, `session_locked`) se marcan como no reintentables (`nextRetryAt = MAX_SAFE_INTEGER`)
+
+**Payloads de `action_log` (`database/models/ActionLog.ts`)**
+
+| Evento | Campo anterior | Campo nuevo | Notas |
+|--------|---------------|-------------|-------|
+| `HOLE_SAVED` | `score` | `strokes` | Eliminados `par` y `handicap` del payload |
+| `HOLE_SAVED` | — | `putts?`, `penalties?`, `fairway_hit?`, `gir?` | Campos opcionales añadidos |
+| `SCORE_AMENDED` | `old_score` / `new_score` | `strokes` | Una sola puntuación corregida |
+| `PENALTY_ADDED` | `penalty_strokes` | `strokes` | |
+| `PENALTY_ADDED` | `rule_reference?` | `penalty_type` | Obligatorio ahora |
+| `ROUND_STARTED` | `competition_id?` | `course_id?`, `players[]?`, `tee_color?` | Alineado con `POST /api/1/scoring/session` |
+| `CONCESSION` | `player_id` | `conceder_player_id` | |
+| `MEDIA_ATTACHED` | `attachment_id` | `media_ref` | UUID v7 que vincula el binario al evento |
+| `SIGNATURE_ADDED` | `player_id` / `attachment_id` | `marker_player_id` / `media_ref` | |
+
+**WebSocket tipos (`services/websocket.ts`)**
+
+| Evento | Antes | Ahora |
+|--------|-------|-------|
+| `leaderboard_updated` | `{ round_id, leaderboard: [...] }` | `{ event_uuid, entries: [...] }` |
+| `leaderboard_updated` entry | `player_id, nombre, total_score, vs_par, holes_completed` | `position, player: {uuid, name}, thru, gross, net, points, status` |
+| `score_confirmed` | `{ round_id, player_id, hole_number, score }` | `{ action_id, materialized: boolean }` |
+| `player_status_changed` | `player_id` | `player_uuid` |
+| `round_finished` | `{ round_id }` | `{ round_id, closed_at, by: 'last_player'\|'admin' }` |
+
+**Nuevos servicios**
+
+| Archivo | Descripción |
+|---------|-------------|
+| `services/bootstrap.ts` | `POST /api/1/sync/bootstrap` — descarga inicial de datos; `GET /api/v1/sync/status` — health check / drift de reloj |
+| `services/scoring-session.ts` | `POST /api/1/scoring/session` — inicio de sesión en servidor; `GET /api/1/scoring/session/{uuid}/scorecard`; `GET /api/1/scoring/leaderboard/{event-uuid}` |
+| `services/media-upload.ts` | `POST /api/1/sync/media` — subida multipart de fotos/firmas; `POST /api/1/sync/device/register` — registro de token FCM/APNs |
+
+---
+
+### 2026-04-21 — Schema local v4 + migración Firebase → WatermelonDB
+
+- Base de datos migrada de Firebase RTDB a WatermelonDB 0.27 (SQLite/JSI)
+- Schema v4: 14 tablas (5 nuevas: `tour_events`, `players_cache`, `leaderboard_cache`, `media_attachments`, `rankings_cache`)
+- Columnas añadidas: `rounds.tour_event_id`, `round_players.player_id`, `hole_scores.strokes_net`
+- `ActionType` extendido de 4 a 14 tipos con payload interfaces tipados
+- Nuevo `SyncEngine`: cola offline con batching (50 acciones/req) y flush periódico (30 s)
+- Nuevo `WebSocketClient`: reconexión automática con backoff escalonado
+- Eliminada dependencia `firebase` del `package.json`
