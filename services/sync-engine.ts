@@ -14,7 +14,7 @@ interface SyncAction {
   id: string;
   action_type: ActionType;
   payload: ActionPayload;
-  created_at: string;    // ISO 8601 — e.g. "2026-04-21T14:32:01.123Z"
+  created_at: number;    // Unix ms
 }
 
 interface SyncRequest {
@@ -28,6 +28,9 @@ interface SyncResponse {
 
 // Backoff por número de reintentos: immediate, 5s, 30s, 2m, 10m
 const RETRY_DELAYS_MS = [0, 5_000, 30_000, 120_000, 600_000];
+
+// Razones de error que el backend nunca resolverá — no reintentar
+const NON_RETRIABLE_PREFIXES = new Set(['invalid_payload', 'unauthorized', 'not_found', 'session_locked']);
 
 // ─── SyncEngine ───────────────────────────────────────────────────────────────
 
@@ -97,7 +100,7 @@ class SyncEngine {
         id: a.id,
         action_type: a.actionType,
         payload: a.parsedPayload,
-        created_at: new Date(a.createdAt).toISOString(),  // ISO 8601 per spec
+        created_at: a.createdAt,
       })),
     };
 
@@ -138,8 +141,7 @@ class SyncEngine {
           const reason = failedMap.get(action.id) ?? 'unknown';
           const nextCount = action.retryCount + 1;
           const delay = RETRY_DELAYS_MS[Math.min(nextCount, RETRY_DELAYS_MS.length - 1)];
-          // Errores de validación no se reintentarán (reason prefix: invalid_payload, unauthorized, etc.)
-          const isTransient = reason.startsWith('internal') || reason.startsWith('network');
+          const isTransient = ![...NON_RETRIABLE_PREFIXES].some((p) => reason.startsWith(p));
           this.nextRetryAt.set(action.id, Date.now() + (isTransient ? delay : Number.MAX_SAFE_INTEGER));
           await action.update((r) => {
             r.retryCount = nextCount;

@@ -676,45 +676,42 @@ El leaderboard llega por WebSocket (`leaderboard_updated`). Si el WS no está di
 
 ## Changelog
 
-### 2026-04-22 — Alineación con `mobile-sync-spec.md`
+### 2026-04-22 — Alineación con `mobile-sync-spec.md` v2.4.0
 
 **Wire protocol (`services/sync-engine.ts`)**
-- `created_at` cambia de Unix ms (`number`) a ISO 8601 (`"2026-04-21T14:32:01.123Z"`)
-- Campo de error en `failed[]`: `error` → `reason`
-- Backoff de reintentos implementado: immediate → 5 s → 30 s → 2 min → 10 min
-- Errores de validación (`invalid_payload`, `unauthorized`, `session_locked`) se marcan como no reintentables (`nextRetryAt = MAX_SAFE_INTEGER`)
+- `created_at` usa Unix ms (`number`) — no ISO 8601
+- Campo de error en `failed[]`: `reason` (string)
+- Backoff de reintentos: immediate → 5 s → 30 s → 2 min → 10 min
+- Errores no reintentables (Set explícita): `invalid_payload`, `unauthorized`, `not_found`, `session_locked`
 
-**Payloads de `action_log` (`database/models/ActionLog.ts`)**
+**Payloads de `action_log` (`database/models/ActionLog.ts`) — spec §2.x**
 
-| Evento | Campo anterior | Campo nuevo | Notas |
-|--------|---------------|-------------|-------|
-| `HOLE_SAVED` | `score` | `strokes` | Eliminados `par` y `handicap` del payload |
-| `HOLE_SAVED` | — | `putts?`, `penalties?`, `fairway_hit?`, `gir?` | Campos opcionales añadidos |
-| `SCORE_AMENDED` | `old_score` / `new_score` | `strokes` | Una sola puntuación corregida |
-| `PENALTY_ADDED` | `penalty_strokes` | `strokes` | |
-| `PENALTY_ADDED` | `rule_reference?` | `penalty_type` | Obligatorio ahora |
-| `ROUND_STARTED` | `competition_id?` | `course_id?`, `players[]?`, `tee_color?` | Alineado con `POST /api/1/scoring/session` |
-| `CONCESSION` | `player_id` | `conceder_player_id` | |
-| `MEDIA_ATTACHED` | `attachment_id` | `media_ref` | UUID v7 que vincula el binario al evento |
-| `SIGNATURE_ADDED` | `player_id` / `attachment_id` | `marker_player_id` / `media_ref` | |
+| Evento | Shape wire |
+|--------|-----------|
+| `HOLE_SAVED` | `{ round_id, hole_number, scores: [{player_id, score, strokes_net?}] }` — un solo evento por hoyo para todo el grupo |
+| `SCORE_AMENDED` | `{ round_id, player_id, hole_number, old_score, new_score, reason? }` |
+| `PENALTY_ADDED` | `{ round_id, player_id, hole_number, penalty_strokes, reason? }` |
+| `ROUND_STARTED` | `{ round_id, mode, codigo_grupo?, tour_event_id?, course_name?, route_name?, tee_color?, hole_pars?, hole_handicaps?, players? }` |
+| `CONCESSION` | `{ round_id, hole_number, conceding_player_id, beneficiary_player_id }` |
+| `MEDIA_ATTACHED` | `{ round_id, hole_number?, attachment_id, attachment_type: 'photo'\|'video'\|'signature' }` |
+| `SIGNATURE_ADDED` | `{ round_id, attachment_id, signed_by_player_id }` |
 
-**WebSocket tipos (`services/websocket.ts`)**
+**WebSocket tipos (`services/websocket.ts`) — spec §4**
 
-| Evento | Antes | Ahora |
-|--------|-------|-------|
-| `leaderboard_updated` | `{ round_id, leaderboard: [...] }` | `{ event_uuid, entries: [...] }` |
-| `leaderboard_updated` entry | `player_id, nombre, total_score, vs_par, holes_completed` | `position, player: {uuid, name}, thru, gross, net, points, status` |
-| `score_confirmed` | `{ round_id, player_id, hole_number, score }` | `{ action_id, materialized: boolean }` |
-| `player_status_changed` | `player_id` | `player_uuid` |
-| `round_finished` | `{ round_id }` | `{ round_id, closed_at, by: 'last_player'\|'admin' }` |
+| Evento | Shape |
+|--------|-------|
+| `leaderboard_updated` | `{ round_id, leaderboard: [{position, player_id, nombre, apellido, total_score, vs_par, holes_completed}] }` |
+| `score_confirmed` | `{ action_id, materialized: boolean }` |
+| `player_status_changed` | `{ player_id, status: 'not_started'\|'ready'\|'playing'\|'finished'\|'withdrawn' }` |
+| `round_finished` | `{ round_id, closed_at }` |
 
 **Nuevos servicios**
 
-| Archivo | Descripción |
-|---------|-------------|
-| `services/bootstrap.ts` | `POST /api/1/sync/bootstrap` — descarga inicial de datos; `GET /api/v1/sync/status` — health check / drift de reloj |
-| `services/scoring-session.ts` | `POST /api/1/scoring/session` — inicio de sesión en servidor; `GET /api/1/scoring/session/{uuid}/scorecard`; `GET /api/1/scoring/leaderboard/{event-uuid}` |
-| `services/media-upload.ts` | `POST /api/1/sync/media` — subida multipart de fotos/firmas; `POST /api/1/sync/device/register` — registro de token FCM/APNs |
+| Archivo | Endpoint |
+|---------|----------|
+| `services/bootstrap.ts` | `POST /api/v1/sync/bootstrap/` — descarga inicial; `GET /api/v1/sync/status/` — health check |
+| `services/media-upload.ts` | `POST /api/v1/sync/media/` — subida multipart; `POST /api/v1/sync/device/register/` — token FCM/APNs |
+| `services/api.ts` | Añadida `apiRequestFormData()` — multipart con auth gestionada igual que `apiRequest()` |
 
 ---
 

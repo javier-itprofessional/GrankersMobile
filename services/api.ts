@@ -67,3 +67,38 @@ export async function apiRequest<T = any>(
 
   return response.json();
 }
+
+export async function apiRequestFormData<T = any>(
+  path: string,
+  body: FormData,
+): Promise<T> {
+  const [deviceId, accessTokenRaw] = await Promise.all([getDeviceId(), AuthStorage.getAccessToken()]);
+  let accessToken = accessTokenRaw;
+
+  if (accessToken && isTokenExpired(accessToken)) {
+    const refreshed = await refreshTokens();
+    if (!refreshed) throw new Error('SESSION_EXPIRED');
+    accessToken = await AuthStorage.getAccessToken();
+  }
+
+  const headers: Record<string, string> = { 'X-Device-ID': deviceId };
+  if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+
+  // Do not set Content-Type — fetch sets it automatically with the multipart boundary
+  let response = await fetch(`${API_URL}${path}`, { method: 'POST', headers, body });
+
+  if (response.status === 401) {
+    const refreshed = await refreshTokens();
+    if (!refreshed) throw new Error('SESSION_EXPIRED');
+    accessToken = await AuthStorage.getAccessToken();
+    headers['Authorization'] = `Bearer ${accessToken ?? ''}`;
+    response = await fetch(`${API_URL}${path}`, { method: 'POST', headers, body });
+  }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => response.statusText);
+    throw new Error(`HTTP ${response.status} ${text}`);
+  }
+
+  return response.json();
+}

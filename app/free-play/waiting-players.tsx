@@ -58,7 +58,7 @@ export default function WaitingPlayersScreen() {
     const unsubscribe = wsClient.on('player_status_changed', (payload) => {
       setPlayersStatus((prev) => {
         const updated = prev.map((p, idx) => {
-          if (payload.player_uuid === String(idx)) {
+          if (payload.player_id === String(idx)) {
             return { ...p, deviceId: payload.status === 'conectado' ? payload.player_uuid : undefined };
           }
           return p;

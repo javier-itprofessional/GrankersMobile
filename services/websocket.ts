@@ -2,22 +2,21 @@ import { AuthStorage } from './auth-storage';
 
 const WS_URL = process.env.EXPO_PUBLIC_WS_URL;
 
-// ─── Tipos de eventos recibidos del backend ───────────────────────────────────
+// ─── Tipos de eventos recibidos del backend (spec v2.4.0) ─────────────────────
 
-// Entrada del leaderboard tal como la envía el backend (REST + WS)
 export interface LeaderboardEntry {
   position: number;
-  player: { uuid: string; name: string; avatar_url?: string };
-  thru: number;           // hoyos completados
-  gross: number;          // golpes brutos totales
-  net: number;            // golpes netos
-  points: number;         // stableford points (si aplica)
-  status: 'active' | 'finished' | 'withdrawn' | 'dnf';
+  player_id: string;
+  nombre: string;
+  apellido: string;
+  total_score: number;
+  vs_par: number;
+  holes_completed: number;
 }
 
 export interface PlayerStatusEvent {
-  player_uuid: string;
-  status: 'preparado' | 'conectado' | 'no_presentado' | 'pendiente';
+  player_id: string;
+  status: 'not_started' | 'ready' | 'playing' | 'finished' | 'withdrawn';
 }
 
 export type WsEventType =
@@ -27,10 +26,10 @@ export type WsEventType =
   | 'round_finished';
 
 export type WsEventPayload = {
-  leaderboard_updated: { event_uuid: string; entries: LeaderboardEntry[] };
+  leaderboard_updated: { round_id: string; leaderboard: LeaderboardEntry[] };
   score_confirmed: { action_id: string; materialized: boolean };
   player_status_changed: PlayerStatusEvent;
-  round_finished: { round_id: string; closed_at: string; by: 'last_player' | 'admin' };
+  round_finished: { round_id: string; closed_at: string };
 };
 
 type Listener<T extends WsEventType> = (payload: WsEventPayload[T]) => void;
@@ -47,7 +46,6 @@ class WebSocketClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private shouldReconnect = false;
 
-  // Conectar a la sala de una ronda
   async connect(roundId: string): Promise<void> {
     this.disconnect();
     this.roundId = roundId;
@@ -66,14 +64,12 @@ class WebSocketClient {
     this.roundId = null;
   }
 
-  // Suscribirse a un tipo de evento
   on<T extends WsEventType>(event: T, listener: Listener<T>): () => void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
     this.listeners.get(event)!.add(listener as Listener<WsEventType>);
 
-    // Devuelve función de cleanup
     return () => {
       this.listeners.get(event)?.delete(listener as Listener<WsEventType>);
     };

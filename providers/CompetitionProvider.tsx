@@ -160,19 +160,12 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
     if (!activeRoundId) return;
 
     const unsub = wsClient.on('leaderboard_updated', (payload) => {
-      // El backend envía event_uuid, no round_id — aceptar si tenemos ronda activa
-      if (activeRoundId) {
-        setWsLeaderboard(payload.entries);
+      if (payload.round_id === activeRoundId) {
+        setWsLeaderboard(payload.leaderboard);
       }
     });
 
-    // score_confirmed: el backend confirma que procesó una acción (action_id)
-    // No contiene player/hole/score — usamos el leaderboard_updated para actualizar UI
-    const unsubScore = wsClient.on('score_confirmed', (_payload) => {
-      // No-op: la confirmación se refleja vía leaderboard_updated
-    });
-
-    return () => { unsub(); unsubScore(); };
+    return unsub;
   }, [activeRoundId]);
 
   // ─── Persistir currentHole y currentScreen ──────────────────────────────────
@@ -332,16 +325,16 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
       return next;
     });
 
-    // Registrar una acción por cada jugador visible
-    for (const player of visiblePlayers) {
-      const holeScore = playerScoresMap.get(player.id)?.scores.find((s) => s.holeNumber === holeNumber);
-      if (!holeScore) continue;
-      await syncEngine.record('HOLE_SAVED', {
-        round_id: activeRoundId,
-        player_id: player.id,
-        hole_number: holeNumber,
-        strokes: holeScore.score,
-      }, activeRoundId);
+    // ONE event for the whole group (spec v2.4.0 §2.2)
+    const scores = visiblePlayers
+      .map((player) => {
+        const holeScore = playerScoresMap.get(player.id)?.scores.find((s) => s.holeNumber === holeNumber);
+        return holeScore ? { player_id: player.id, score: holeScore.score } : null;
+      })
+      .filter((s): s is { player_id: string; score: number } => s !== null);
+
+    if (scores.length > 0) {
+      await syncEngine.record('HOLE_SAVED', { round_id: activeRoundId, hole_number: holeNumber, scores }, activeRoundId);
     }
   }, [competition, activeRoundId, playerScoresMap, scoringMode, visiblePlayerIds]);
 
@@ -425,13 +418,13 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
     // Si el backend ya envió el leaderboard por WS, usarlo directamente
     if (wsLeaderboard) {
       return wsLeaderboard.map((entry) => {
-        const player = players.find((p) => p.id === entry.player.uuid);
+        const player = players.find((p) => p.id === entry.player_id);
         return {
-          player: player ?? { id: entry.player.uuid, nombre: entry.player.name, apellido: '' },
-          totalScore: entry.gross,
+          player: player ?? { id: entry.player_id, nombre: entry.nombre, apellido: entry.apellido },
+          totalScore: entry.total_score,
           totalPar: 0,
-          score: entry.net,
-          holesCompleted: entry.thru,
+          score: entry.vs_par,
+          holesCompleted: entry.holes_completed,
           position: entry.position,
         };
       });

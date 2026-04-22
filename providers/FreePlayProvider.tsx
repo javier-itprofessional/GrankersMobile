@@ -313,10 +313,15 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
       }
     });
 
-    for (const s of savedScores) {
+    // ONE event for the whole group (spec v2.4.0 §2.2)
+    if (savedScores.length > 0) {
       syncEngine.record(
         'HOLE_SAVED',
-        { round_id: activeRoundId, player_id: s.playerId, hole_number: holeNumber, strokes: s.score },
+        {
+          round_id: activeRoundId,
+          hole_number: holeNumber,
+          scores: savedScores.map((s) => ({ player_id: s.playerId, score: s.score })),
+        },
         activeRoundId
       ).catch(() => {});
     }
