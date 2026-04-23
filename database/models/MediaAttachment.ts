@@ -1,7 +1,7 @@
 import { Model } from '@nozbe/watermelondb';
 import { field, text } from '@nozbe/watermelondb/decorators';
 
-export type AttachmentType = 'photo' | 'signature' | 'document';
+export type AttachmentType = 'photo' | 'signature';
 export type UploadStatus = 'pending' | 'uploading' | 'synced' | 'failed';
 
 export default class MediaAttachment extends Model {

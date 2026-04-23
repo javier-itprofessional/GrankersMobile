@@ -2,7 +2,7 @@
 
 > Guía de integración para el equipo de backend  
 > React Native (Expo) · WatermelonDB · WebSocket  
-> Última actualización: 2026-04-23 — ver [Changelog](#changelog)
+> Última actualización: 2026-04-23 (2) — ver [Changelog](#changelog)
 
 ---
 
@@ -368,7 +368,7 @@ Content-Type: application/json
 
 | Tipo | Payload |
 |------|---------|
-| `MEDIA_ATTACHED` | `{ attachment_id, attachment_type: 'photo'\|'document', hole_number? }` |
+| `MEDIA_ATTACHED` | `{ attachment_id, attachment_type: 'photo'\|'signature', hole_number? }` |
 | `SIGNATURE_ADDED` | `{ attachment_id, signed_by_player_id }` |
 
 ### Idempotencia
@@ -452,7 +452,7 @@ wss://{EXPO_PUBLIC_WS_URL}/ws/round/{roundId}/?token={accessToken}
   "payload": {
     "round_id": "string",
     "player_id": "string",
-    "status": "preparado"
+    "status": "ready"
   }
 }
 ```
@@ -480,8 +480,8 @@ La app usa **WatermelonDB 0.27** sobre SQLite con JSI (JavaScript Interface) par
 ```typescript
 // database/index.ts
 const adapter = new SQLiteAdapter({
-  schema,           // schema v4
-  migrations,       // migraciones v1→v4
+  schema,           // schema v5
+  migrations,       // migraciones v1→v5
   dbName: 'grankers',
   jsi: true         // JSI habilitado
 })
@@ -678,6 +678,13 @@ El leaderboard llega por WebSocket (`leaderboard_updated`). Si el WS no está di
 
 ## Changelog
 
+### 2026-04-23 (2) — Correcciones de tipos de adjuntos + arreglos de documento
+
+- `database/models/MediaAttachment.ts` — `AttachmentType` reducido a `'photo' | 'signature'`; `'document'` eliminado (no soportado por backend ni por el pipeline de media).
+- `docs/technical-architecture.md` — Corregido `MEDIA_ATTACHED.attachment_type` en tablas de action_log (eliminado `'video'` y `'document'`). Ejemplo `player_status_changed.status` corregido de `"preparado"` → `"ready"`. Comentarios de inicialización DB actualizados a schema v5 / migraciones v1→v5.
+
+---
+
 ### 2026-04-23 — Correcciones de contrato con backend + renombrado a inglés
 
 **Correcciones de contrato (bugs reales)**
@@ -748,7 +755,7 @@ capa de transformación en la frontera de la API.
 | `PENALTY_ADDED` | `{ round_id, player_id, hole_number, penalty_strokes, reason? }` |
 | `ROUND_STARTED` | `{ round_id, mode, codigo_grupo?, tour_event_id?, course_name?, route_name?, tee_color?, hole_pars?, hole_handicaps?, players? }` |
 | `CONCESSION` | `{ round_id, hole_number, conceding_player_id, beneficiary_player_id }` |
-| `MEDIA_ATTACHED` | `{ round_id, hole_number?, attachment_id, attachment_type: 'photo'\|'video'\|'signature' }` |
+| `MEDIA_ATTACHED` | `{ round_id, hole_number?, attachment_id, attachment_type: 'photo'\|'signature' }` |
 | `SIGNATURE_ADDED` | `{ round_id, attachment_id, signed_by_player_id }` |
 
 **WebSocket tipos (`services/websocket.ts`) — spec §4**
