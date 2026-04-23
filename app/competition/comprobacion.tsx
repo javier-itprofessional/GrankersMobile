@@ -33,16 +33,16 @@ export default function ComprobacionScreen() {
 
   const myPlayer = useMemo(() => {
     if (!competition || !currentDevicePlayerId) return null;
-    return competition.jugadores.find(p => p.id === currentDevicePlayerId) ?? null;
+    return competition.players.find(p => p.id === currentDevicePlayerId) ?? null;
   }, [competition, currentDevicePlayerId]);
 
   const markerPlayer = useMemo(() => {
     if (!competition || !currentDevicePlayerId) return null;
-    const jugadores = competition.jugadores;
-    const myIndex = jugadores.findIndex(p => p.id === currentDevicePlayerId);
+    const players = competition.players;
+    const myIndex = players.findIndex(p => p.id === currentDevicePlayerId);
     if (myIndex === -1) return null;
-    const prevIndex = (myIndex - 1 + jugadores.length) % jugadores.length;
-    return jugadores[prevIndex];
+    const prevIndex = (myIndex - 1 + players.length) % players.length;
+    return players[prevIndex];
   }, [competition, currentDevicePlayerId]);
 
   const myOwnScores = useMemo(() => {
@@ -132,7 +132,7 @@ export default function ComprobacionScreen() {
 
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Comprobación de resultado</Text>
-        <Text style={styles.headerSubtitle}>{competition.nombre_competicion}</Text>
+        <Text style={styles.headerSubtitle}>{competition.competitionName}</Text>
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
@@ -144,7 +144,7 @@ export default function ComprobacionScreen() {
 
           <View style={styles.blockContent}>
             <Text style={styles.markerName}>
-              {markerPlayer ? `${markerPlayer.nombre} ${markerPlayer.apellido}` : 'Marcador desconocido'}
+              {markerPlayer ? `${markerPlayer.firstName} ${markerPlayer.lastName}` : 'Marcador desconocido'}
             </Text>
 
             {markerScoresForMe && markerScoresForMe.allHolesCompleted ? (
@@ -183,7 +183,7 @@ export default function ComprobacionScreen() {
 
           <View style={styles.blockContent}>
             <Text style={styles.markerName}>
-              {myPlayer.nombre} {myPlayer.apellido}
+              {myPlayer.firstName} {myPlayer.lastName}
             </Text>
 
             {myOwnScores ? (

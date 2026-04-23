@@ -187,15 +187,15 @@ export default function SelectDevicePlayerScreen() {
       setGameInfo(params.gameName, params.groupName);
       setDevicePlayer(playerId);
       
-      const playersWithIds = players.map((p: { id: string; nombre: string; apellido: string; handicap: string; licencia?: string }) => ({
+      const playersWithIds = players.map((p: { id: string; firstName: string; lastName: string; handicap: string; license?: string }) => ({
         id: p.id,
-        nombre: p.nombre,
-        apellido: p.apellido,
-        licencia: p.licencia,
+        firstName: p.firstName,
+        lastName: p.lastName,
+        license: p.license,
         handicap: p.handicap ? parseFloat(p.handicap) : 0,
         isDevice: p.id === playerId,
       }));
-      
+
       startFreePlay(playersWithIds);
       
       if (currentHole > 1) {
@@ -229,11 +229,11 @@ export default function SelectDevicePlayerScreen() {
           {
             text: 'Continuar',
             onPress: () => {
-              const playersWithIds = players.map((p: { id: string; nombre: string; apellido: string; handicap: string; licencia?: string }) => ({
+              const playersWithIds = players.map((p: { id: string; firstName: string; lastName: string; handicap: string; license?: string }) => ({
                 id: p.id,
-                nombre: p.nombre,
-                apellido: p.apellido,
-                licencia: p.licencia,
+                firstName: p.firstName,
+                lastName: p.lastName,
+                license: p.license,
                 handicap: p.handicap ? parseFloat(p.handicap) : 0,
                 isDevice: p.id === playerId,
               }));
@@ -295,7 +295,7 @@ export default function SelectDevicePlayerScreen() {
           </View>
 
           <View style={styles.playersContainer}>
-            {unassignedPlayers.map((player: { id: string; nombre: string; apellido: string; handicap?: string }) => (
+            {unassignedPlayers.map((player: { id: string; firstName: string; lastName: string; handicap?: string }) => (
               <TouchableOpacity
                 key={player.id}
                 style={[styles.playerButton, isLinking && styles.playerButtonDisabled]}
@@ -305,7 +305,7 @@ export default function SelectDevicePlayerScreen() {
               >
                 <View style={styles.playerInfo}>
                   <Text style={styles.playerName}>
-                    {player.nombre} {player.apellido}
+                    {player.firstName} {player.lastName}
                   </Text>
                   {player.handicap && (
                     <Text style={styles.playerHandicap}>

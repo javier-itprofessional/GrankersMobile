@@ -7,8 +7,8 @@ const WS_URL = process.env.EXPO_PUBLIC_WS_URL;
 export interface LeaderboardEntry {
   position: number;
   player_id: string;
-  nombre: string;
-  apellido: string;
+  first_name: string;
+  last_name: string;
   total_score: number;
   vs_par: number;
   holes_completed: number;

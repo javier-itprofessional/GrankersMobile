@@ -56,14 +56,14 @@ export interface PlayerReadyPayload {
 export interface RoundStartedPayload {
   round_id: string;
   mode: 'competition' | 'free-play';
-  codigo_grupo?: string;
+  group_code?: string;
   tour_event_id?: string;
   course_name?: string;
   route_name?: string;
   tee_color?: string;
   hole_pars?: number[];
   hole_handicaps?: number[];
-  players?: { player_id: string; nombre: string; apellido: string; handicap?: number; tee_color?: string }[];
+  players?: { player_id: string; first_name: string; last_name: string; handicap?: number; tee_color?: string }[];
 }
 
 export interface RoundFinishedPayload {

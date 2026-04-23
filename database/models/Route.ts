@@ -12,9 +12,9 @@ export default class Route extends Model {
 
   @text('course_id') courseId!: string;
   @text('course_external_id') courseExternalId!: string;
-  @text('nombre') nombre!: string;
-  @field('num_hoyos') numHoyos!: number;          // 9 o 18
-  @field('par_total') parTotal!: number;           // ej. 72
+  @text('name') name!: string;
+  @field('num_holes') numHoles!: number;
+  @field('par_total') parTotal!: number;
   @field('slope') slope!: number | null;
   @field('course_rating') courseRating!: number | null;
   @field('synced_at') syncedAt!: number;

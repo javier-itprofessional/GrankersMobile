@@ -159,20 +159,17 @@ export default function WelcomeScreen() {
 
   const handleLoadCompetition = useCallback(async (session: FoundCompetitionSession) => {
     startCompetition({
-      codigo_grupo: session.codigoGrupo,
-      nombre_competicion: session.nombreCompeticion,
-      nombre_prueba: session.nombrePrueba,
-      jugadores: session.jugadores.map(j => ({
-        id: j.id,
-        nombre: j.nombre,
-        apellido: j.apellido,
-        licencia: j.licencia,
+      groupCode: session.groupCode,
+      competitionName: session.competitionName,
+      eventName: session.eventName,
+      courseName: session.courseName,
+      routeName: session.routeName,
+      players: session.players.map((j) => ({
+        id: j.id, firstName: j.first_name, lastName: j.last_name, license: j.license,
       })),
-      campo: session.campo,
-      recorrido: session.recorrido,
     });
     await setDevicePlayerId(session.playerId);
-    const holeScores = await getPlayerHoleScores(session.codigoGrupo, session.playerId);
+    const holeScores = await getPlayerHoleScores(session.groupCode, session.playerId);
     let firstUnscoredHole = 1;
     for (let i = 1; i <= 18; i++) {
       const holeData = holeScores[`hoyo_${i}`];
@@ -183,10 +180,10 @@ export default function WelcomeScreen() {
       if (i === 18) firstUnscoredHole = 18;
     }
     goToHole(firstUnscoredHole);
-    const myIndex = session.jugadores.findIndex(j => j.id === session.playerId);
+    const myIndex = session.players.findIndex((j) => j.id === session.playerId);
     if (myIndex !== -1) {
-      const nextIndex = (myIndex + 1) % session.jugadores.length;
-      setScoringModeAndPlayers('partial', [session.playerId, session.jugadores[nextIndex].id]);
+      const nextIndex = (myIndex + 1) % session.players.length;
+      setScoringModeAndPlayers('partial', [session.playerId, session.players[nextIndex].id]);
     }
     router.replace('/competition/scoring');
   }, [startCompetition, setDevicePlayerId, goToHole, setScoringModeAndPlayers, router]);
@@ -202,7 +199,7 @@ export default function WelcomeScreen() {
       if (session) {
         Alert.alert(
           'Competición encontrada',
-          `Se ha encontrado una competición en curso (${session.nombreCompeticion}) en la que está registrado como ${session.playerNombre} ${session.playerApellido}.`,
+          `Se ha encontrado una competición en curso (${session.competitionName}) en la que está registrado como ${session.playerFirstName} ${session.playerLastName}.`,
           [
             { text: 'Salir', style: 'destructive', onPress: handleExitCompetitionFlow },
             { text: 'Cargar competición', onPress: () => handleLoadCompetition(session) },

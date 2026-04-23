@@ -4,14 +4,14 @@ import Colors from '../constants/colors';
 
 interface PlayerCardProps {
   index: number;
-  nombre: string;
-  apellido: string;
-  licencia?: string;
+  firstName: string;
+  lastName: string;
+  license?: string;
   handicap?: string;
-  estado?: 'preparado' | 'no_presentado' | 'no_preparado' | null;
+  status?: 'ready' | 'not_present' | 'not_ready' | null;
   isCompetition?: boolean;
-  onChangeNombre: (text: string) => void;
-  onChangeApellido: (text: string) => void;
+  onChangeFirstName: (text: string) => void;
+  onChangeLastName: (text: string) => void;
   onChangeHandicap?: (text: string) => void;
   onSearchLicense: () => void;
   onMarkReady?: () => void;
@@ -20,26 +20,26 @@ interface PlayerCardProps {
 
 export default function PlayerCard({
   index,
-  nombre,
-  apellido,
-  licencia,
+  firstName,
+  lastName,
+  license,
   handicap,
-  estado,
+  status,
   isCompetition = false,
-  onChangeNombre,
-  onChangeApellido,
+  onChangeFirstName,
+  onChangeLastName,
   onChangeHandicap,
   onSearchLicense,
   onMarkReady,
   onMarkNotPresent,
 }: PlayerCardProps) {
-  const isPreparado = estado === 'preparado';
-  const isDisabled = estado === 'preparado' || estado === 'no_presentado';
+  const isReady = status === 'ready';
+  const isDisabled = status === 'ready' || status === 'not_present';
   return (
     <View style={styles.playerCard}>
       <View style={styles.playerHeader}>
         <Text style={styles.playerLabel}>
-          {licencia ? `Licencia ${licencia}` : `Jugador ${index + 1}`}
+          {license ? `Licencia ${license}` : `Jugador ${index + 1}`}
         </Text>
         {!isCompetition && (
           <TouchableOpacity
@@ -56,18 +56,18 @@ export default function PlayerCard({
       <TextInput
         style={styles.input}
         placeholder="Nombre"
-        value={nombre}
-        onChangeText={onChangeNombre}
-        testID={`nombre-${index + 1}`}
+        value={firstName}
+        onChangeText={onChangeFirstName}
+        testID={`firstName-${index + 1}`}
         editable={!isCompetition}
       />
 
       <TextInput
         style={styles.input}
         placeholder="Apellido"
-        value={apellido}
-        onChangeText={onChangeApellido}
-        testID={`apellido-${index + 1}`}
+        value={lastName}
+        onChangeText={onChangeLastName}
+        testID={`lastName-${index + 1}`}
         editable={!isCompetition}
       />
 
@@ -105,7 +105,7 @@ export default function PlayerCard({
         </View>
       )}
 
-      {isPreparado && (
+      {isReady && (
         <View style={styles.watermarkContainer}>
           <View style={styles.watermark}>
             <Text style={styles.watermarkText}>Preparado</Text>

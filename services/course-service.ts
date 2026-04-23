@@ -2,22 +2,22 @@ import { Q } from '@nozbe/watermelondb';
 import { database, Course, Route, Hole } from '@/database';
 import { apiRequest } from './api';
 
-const SYNC_TTL_MS = 24 * 60 * 60 * 1000;  // re-sync cada 24h
+const SYNC_TTL_MS = 24 * 60 * 60 * 1000;
 
-// ─── Tipos de la API ──────────────────────────────────────────────────────────
+// ─── API types ────────────────────────────────────────────────────────────────
 
 export interface HoleData {
   hole_number: number;
   par: number;
   handicap: number;
-  distancia_metros?: number;
-  distancia_yards?: number;
+  distance_meters?: number;
+  distance_yards?: number;
 }
 
 export interface RouteData {
-  id: string;                     // ID del backend
-  nombre: string;
-  num_hoyos: number;
+  id: string;
+  name: string;
+  num_holes: number;
   par_total: number;
   slope?: number;
   course_rating?: number;
@@ -26,13 +26,13 @@ export interface RouteData {
 
 export interface CourseData {
   id: string;
-  nombre: string;
-  ciudad?: string;
-  pais?: string;
+  name: string;
+  city?: string;
+  country?: string;
   routes: RouteData[];
 }
 
-// ─── API pública del servicio ─────────────────────────────────────────────────
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 export async function getCourseRouteData(
   courseName: string,
@@ -55,17 +55,16 @@ export async function getHoleHandicaps(courseName: string, routeName: string): P
   return data.holes.map((h) => h.handicap);
 }
 
-// Lista de campos disponibles (para select-course screen)
 export async function listCourses(): Promise<CourseData[]> {
   return apiRequest<CourseData[]>('/api/v1/courses/');
 }
 
-// ─── Caché local ──────────────────────────────────────────────────────────────
+// ─── Local cache ──────────────────────────────────────────────────────────────
 
 async function getFromCache(courseName: string, routeName: string): Promise<RouteData | null> {
   const routes = await database
     .get<Route>('routes')
-    .query(Q.and(Q.where('course_external_id', courseName), Q.where('nombre', routeName)))
+    .query(Q.and(Q.where('course_external_id', courseName), Q.where('name', routeName)))
     .fetch();
 
   if (routes.length === 0) return null;
@@ -82,8 +81,8 @@ async function getFromCache(courseName: string, routeName: string): Promise<Rout
 
   return {
     id: route.courseExternalId,
-    nombre: route.nombre,
-    num_hoyos: route.numHoyos,
+    name: route.name,
+    num_holes: route.numHoles,
     par_total: route.parTotal,
     slope: route.slope ?? undefined,
     course_rating: route.courseRating ?? undefined,
@@ -93,25 +92,24 @@ async function getFromCache(courseName: string, routeName: string): Promise<Rout
         hole_number: h.holeNumber,
         par: h.par,
         handicap: h.handicap,
-        distancia_metros: h.distanciaMetros ?? undefined,
-        distancia_yards: h.distanciaYards ?? undefined,
+        distance_meters: h.distanceMeters ?? undefined,
+        distance_yards: h.distanceYards ?? undefined,
       })),
   };
 }
 
-// ─── Fetch desde backend + persistir en WatermelonDB ─────────────────────────
+// ─── Fetch from backend + persist ─────────────────────────────────────────────
 
 async function fetchAndCache(courseName: string, routeName: string): Promise<RouteData | null> {
   try {
-    // GET /api/v1/courses/?nombre={courseName}&route={routeName}
     const results = await apiRequest<CourseData[]>(
-      `/api/v1/courses/?nombre=${encodeURIComponent(courseName)}&route=${encodeURIComponent(routeName)}`
+      `/api/v1/courses/?name=${encodeURIComponent(courseName)}&route=${encodeURIComponent(routeName)}`
     );
 
     const course = results[0];
     if (!course) return null;
 
-    const route = course.routes.find((r) => r.nombre === routeName);
+    const route = course.routes.find((r) => r.name === routeName);
     if (!route) return null;
 
     await persistCourse(course, route);
@@ -124,7 +122,6 @@ async function fetchAndCache(courseName: string, routeName: string): Promise<Rou
 
 async function persistCourse(courseData: CourseData, routeData: RouteData): Promise<void> {
   await database.write(async () => {
-    // Upsert Course
     let courseRecord: Course;
     const existing = await database
       .get<Course>('courses')
@@ -137,17 +134,16 @@ async function persistCourse(courseData: CourseData, routeData: RouteData): Prom
     } else {
       courseRecord = await database.get<Course>('courses').create((r) => {
         r.externalId = courseData.id;
-        r.nombre = courseData.nombre;
-        r.ciudad = courseData.ciudad ?? null;
-        r.pais = courseData.pais ?? null;
+        r.name = courseData.name;
+        r.city = courseData.city ?? null;
+        r.country = courseData.country ?? null;
         r.syncedAt = Date.now();
       });
     }
 
-    // Borrar Route + Holes previos
     const oldRoutes = await database
       .get<Route>('routes')
-      .query(Q.and(Q.where('course_id', courseRecord.id), Q.where('nombre', routeData.nombre)))
+      .query(Q.and(Q.where('course_id', courseRecord.id), Q.where('name', routeData.name)))
       .fetch();
 
     for (const old of oldRoutes) {
@@ -156,27 +152,25 @@ async function persistCourse(courseData: CourseData, routeData: RouteData): Prom
       await old.destroyPermanently();
     }
 
-    // Crear Route
     const routeRecord = await database.get<Route>('routes').create((r) => {
       r.courseId = courseRecord.id;
       r.courseExternalId = courseData.id;
-      r.nombre = routeData.nombre;
-      r.numHoyos = routeData.num_hoyos;
+      r.name = routeData.name;
+      r.numHoles = routeData.num_holes;
       r.parTotal = routeData.par_total;
       r.slope = routeData.slope ?? null;
       r.courseRating = routeData.course_rating ?? null;
       r.syncedAt = Date.now();
     });
 
-    // Crear Holes
     for (const hole of routeData.holes) {
       await database.get<Hole>('holes').create((h) => {
         h.routeId = routeRecord.id;
         h.holeNumber = hole.hole_number;
         h.par = hole.par;
         h.handicap = hole.handicap;
-        h.distanciaMetros = hole.distancia_metros ?? null;
-        h.distanciaYards = hole.distancia_yards ?? null;
+        h.distanceMeters = hole.distance_meters ?? null;
+        h.distanceYards = hole.distance_yards ?? null;
       });
     }
   });

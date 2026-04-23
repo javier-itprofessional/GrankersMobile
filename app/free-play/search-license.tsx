@@ -13,14 +13,8 @@ import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { Search } from 'lucide-react-native';
 import Colors from '../../constants/colors';
 import { searchPlayerLicenses } from '@/services/game-service';
+import type { LicensePlayer } from '@/services/game-service';
 import SearchResultCard from '../../components/SearchResultCard';
-
-interface LicensePlayer {
-  licencia: string;
-  nombre: string;
-  apellido: string;
-  handicap?: number;
-}
 
 export default function SearchLicenseScreen() {
   const router = useRouter();
@@ -35,15 +29,15 @@ export default function SearchLicenseScreen() {
   }>();
   const playerIndex = params.playerIndex || '1';
   
-  const [licencia, setLicencia] = useState('');
-  const [nombre, setNombre] = useState('');
-  const [apellido, setApellido] = useState('');
+  const [license, setLicense] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<LicensePlayer[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
 
   const handleSearch = async () => {
-    if (!licencia.trim() && !nombre.trim() && !apellido.trim()) {
+    if (!license.trim() && !firstName.trim() && !lastName.trim()) {
       Alert.alert('Error', 'Debes introducir al menos un criterio de búsqueda');
       return;
     }
@@ -51,20 +45,20 @@ export default function SearchLicenseScreen() {
     setSearching(true);
     setHasSearched(false);
     setResults([]);
-    
+
     try {
       console.log('Searching with params:', {
-        licencia: licencia.trim(),
-        nombre: nombre.trim(),
-        apellido: apellido.trim(),
-        codigoGrupo: 'GLOBAL'
+        license: license.trim(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        groupCode: 'GLOBAL',
       });
-      
+
       const searchResults = await searchPlayerLicenses({
-        licencia: licencia.trim(),
-        nombre: nombre.trim(),
-        apellido: apellido.trim(),
-        codigoGrupo: 'GLOBAL',
+        license: license.trim(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        groupCode: 'GLOBAL',
       });
       
       console.log('Search results:', searchResults);
@@ -102,25 +96,25 @@ export default function SearchLicenseScreen() {
       if ((index + 1).toString() === playerIndex) {
         return {
           ...p,
-          nombre: player.nombre,
-          apellido: player.apellido,
-          licencia: player.licencia,
+          firstName: player.firstName,
+          lastName: player.lastName,
+          license: player.license,
           handicap: player.handicap?.toString() || '',
         };
       }
       return p;
     });
-    
+
     console.log('Updated players with selection:', updatedPlayers);
-    
+
     router.push({
       pathname: '/free-play/setup',
       params: {
         numberOfPlayers: params.numberOfPlayers,
         selectedPlayerIndex: playerIndex,
-        selectedPlayerNombre: player.nombre,
-        selectedPlayerApellido: player.apellido,
-        selectedPlayerLicencia: player.licencia,
+        selectedPlayerFirstName: player.firstName,
+        selectedPlayerLastName: player.lastName,
+        selectedPlayerLicense: player.license,
         selectedPlayerHandicap: player.handicap?.toString() || '',
         existingPlayers: JSON.stringify(updatedPlayers),
         courseName: params.courseName,
@@ -154,10 +148,10 @@ export default function SearchLicenseScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="Introduce la licencia"
-                value={licencia}
-                onChangeText={setLicencia}
+                value={license}
+                onChangeText={setLicense}
                 autoCapitalize="characters"
-                testID="licencia-input"
+                testID="license-input"
               />
             </View>
 
@@ -166,9 +160,9 @@ export default function SearchLicenseScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="Introduce el nombre"
-                value={nombre}
-                onChangeText={setNombre}
-                testID="nombre-input"
+                value={firstName}
+                onChangeText={setFirstName}
+                testID="firstName-input"
               />
             </View>
 
@@ -177,9 +171,9 @@ export default function SearchLicenseScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="Introduce el apellido"
-                value={apellido}
-                onChangeText={setApellido}
-                testID="apellido-input"
+                value={lastName}
+                onChangeText={setLastName}
+                testID="lastName-input"
               />
             </View>
           </View>
@@ -187,10 +181,10 @@ export default function SearchLicenseScreen() {
           <TouchableOpacity
             style={[
               styles.searchButton,
-              (!licencia.trim() && !nombre.trim() && !apellido.trim()) && styles.searchButtonDisabled,
+              (!license.trim() && !firstName.trim() && !lastName.trim()) && styles.searchButtonDisabled,
             ]}
             onPress={handleSearch}
-            disabled={!licencia.trim() && !nombre.trim() && !apellido.trim()}
+            disabled={!license.trim() && !firstName.trim() && !lastName.trim()}
             testID="search-button"
           >
             {searching ? (
@@ -214,10 +208,10 @@ export default function SearchLicenseScreen() {
 
             {results.map((player, index) => (
               <SearchResultCard
-                key={`${player.licencia}-${index}`}
-                nombre={player.nombre}
-                apellido={player.apellido}
-                licencia={player.licencia}
+                key={`${player.license}-${index}`}
+                firstName={player.firstName}
+                lastName={player.lastName}
+                license={player.license}
                 handicap={player.handicap}
                 onPress={() => handleSelectPlayer(player)}
                 testID={`player-result-${index}`}

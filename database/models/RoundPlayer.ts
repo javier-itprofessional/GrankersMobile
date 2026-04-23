@@ -10,14 +10,14 @@ export default class RoundPlayer extends Model {
 
   @text('round_id') roundId!: string;
   @text('player_external_id') playerExternalId!: string;
-  @text('nombre') nombre!: string;
-  @text('apellido') apellido!: string;
-  @text('licencia') licencia!: string | null;
+  @text('first_name') firstName!: string;
+  @text('last_name') lastName!: string;
+  @text('license') license!: string | null;
   @field('handicap') handicap!: number | null;
   @text('player_id') playerId!: string | null;          // FK -> players_cache.external_id
   @text('device_id') deviceId!: string | null;
   @field('is_local_device') isLocalDevice!: boolean;
-  @text('estado') estado!: string;
+  @text('status') status!: string;
 
   @relation('rounds', 'round_id') round!: Round;
 }

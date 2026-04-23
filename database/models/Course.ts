@@ -8,10 +8,10 @@ export default class Course extends Model {
     routes: { type: 'has_many' as const, foreignKey: 'course_id' },
   };
 
-  @text('external_id') externalId!: string;   // clave en Firebase ej. "Real Club de Golf"
-  @text('nombre') nombre!: string;
-  @text('ciudad') ciudad!: string | null;
-  @text('pais') pais!: string | null;
+  @text('external_id') externalId!: string;
+  @text('name') name!: string;
+  @text('city') city!: string | null;
+  @text('country') country!: string | null;
   @field('synced_at') syncedAt!: number;
 
   @children('routes') routes!: Route[];

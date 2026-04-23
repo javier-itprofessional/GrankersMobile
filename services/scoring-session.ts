@@ -13,7 +13,7 @@ interface CreateSessionRequest {
   mode: 'competition' | 'free-play';
   tee_color?: string;
   tour_event_uuid?: string;   // solo si mode = 'competition'
-  codigo_grupo?: string;
+  group_code?: string;
   players: SessionPlayer[];
 }
 

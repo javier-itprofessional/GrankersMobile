@@ -3,7 +3,7 @@ import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { Users, Calendar, Trophy } from 'lucide-react-native';
 import Colors from '../../constants/colors';
 import { useCompetition } from '../../providers/CompetitionProvider';
-import type { FirebaseCompetitionData } from '../../types/game';
+import type { FirebaseCompetitionData, Competition } from '../../types/game';
 
 export default function ConfirmationScreen() {
   const router = useRouter();
@@ -14,7 +14,18 @@ export default function ConfirmationScreen() {
 
   const handleAccept = () => {
     console.log('Accepting competition:', competition);
-    startCompetition(competition);
+    const comp: Competition = {
+      groupCode: competition.group_code,
+      competitionName: competition.competition_name,
+      eventName: competition.event_name,
+      courseName: competition.course_name,
+      routeName: competition.route_name,
+      players: competition.players.map((p) => ({
+        id: p.id, firstName: p.first_name, lastName: p.last_name,
+        license: p.license, handicap: p.handicap,
+      })),
+    };
+    startCompetition(comp);
     router.push({
       pathname: '/competition/select-player',
       params: {
@@ -42,7 +53,7 @@ export default function ConfirmationScreen() {
           <View style={styles.iconContainer}>
             <Trophy size={40} color={Colors.golf.primary} strokeWidth={1.5} />
           </View>
-          <Text style={styles.title}>{competition.nombre_competicion}</Text>
+          <Text style={styles.title}>{competition.competition_name}</Text>
         </View>
 
         <View style={styles.card}>
@@ -50,7 +61,7 @@ export default function ConfirmationScreen() {
             <Calendar size={18} color={Colors.golf.primary} />
             <Text style={styles.cardHeaderText}>PRUEBA</Text>
           </View>
-          <Text style={styles.infoValue}>{competition.nombre_prueba}</Text>
+          <Text style={styles.infoValue}>{competition.event_name}</Text>
         </View>
 
         <View style={styles.card}>
@@ -60,13 +71,13 @@ export default function ConfirmationScreen() {
           </View>
 
           <View style={styles.playersList}>
-            {competition.jugadores.map((player, index) => (
+            {competition.players.map((player, index) => (
               <View key={player.id} style={styles.playerItem}>
                 <View style={styles.playerNumber}>
                   <Text style={styles.playerNumberText}>{index + 1}</Text>
                 </View>
                 <Text style={styles.playerName}>
-                  {player.nombre} {player.apellido}
+                  {player.first_name} {player.last_name}
                 </Text>
                 {player.handicap !== undefined && (
                   <View style={styles.handicapBadge}>

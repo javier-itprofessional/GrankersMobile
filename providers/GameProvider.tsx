@@ -104,15 +104,15 @@ export const [GameProvider, useGame] = createContextHook(() => {
 
   const startCompetition = useCallback((comp: Competition) => {
     console.log('Starting competition:', comp);
-    console.log('Player IDs:', comp.jugadores.map(p => p.id));
+    console.log('Player IDs:', comp.players.map(p => p.id));
     setCompetition(comp);
     setIsCompetition(true);
     setCurrentHole(1);
     const pars = generateHolePars();
     setHolePars(pars);
-    
+
     const scoresMap = new Map<string, PlayerScores>();
-    comp.jugadores.forEach((player) => {
+    comp.players.forEach((player) => {
       console.log(`Creating score map for player: ${player.id}`);
       const scores: HoleScore[] = [];
       for (let i = 1; i <= 18; i++) {
@@ -134,18 +134,18 @@ export const [GameProvider, useGame] = createContextHook(() => {
     setPlayerScoresMap(scoresMap);
   }, []);
 
-  const startFreePlay = useCallback((players: { id: string; nombre: string; apellido: string }[]) => {
+  const startFreePlay = useCallback((players: { id: string; firstName: string; lastName: string }[]) => {
     console.log('Starting free play with players:', players);
     setIsCompetition(false);
     setCurrentHole(1);
     const pars = generateHolePars();
     setHolePars(pars);
-    
+
     const comp: Competition = {
-      codigo_grupo: '',
-      nombre_competicion: 'Partida Libre',
-      nombre_prueba: 'Partida Libre',
-      jugadores: players.map((p) => ({ ...p, handicap: 0 })),
+      groupCode: '',
+      competitionName: 'Free Play',
+      eventName: 'Free Play',
+      players: players.map((p) => ({ ...p, handicap: 0 })),
     };
     setCompetition(comp);
     
@@ -192,7 +192,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     console.log('=== SAVING HOLE ===');
     console.log('Hole number:', holeNumber);
     console.log('Competition:', competition);
-    console.log('Competition jugadores:', competition?.jugadores.map(j => ({ id: j.id, nombre: j.nombre })));
+    console.log('Competition players:', competition?.players.map(p => ({ id: p.id, firstName: p.firstName })));
     console.log('PlayerScoresMap size:', playerScoresMap.size);
     console.log('PlayerScoresMap keys:', Array.from(playerScoresMap.keys()));
     
@@ -203,8 +203,8 @@ export const [GameProvider, useGame] = createContextHook(() => {
       return;
     }
 
-    competition.jugadores.forEach((player) => {
-      console.log(`Processing player from competition - ID: ${player.id}, Name: ${player.nombre}`);
+    competition.players.forEach((player) => {
+      console.log(`Processing player from competition - ID: ${player.id}, Name: ${player.firstName}`);
       const playerScores = playerScoresMap.get(player.id);
       
       if (!playerScores) {
@@ -221,8 +221,8 @@ export const [GameProvider, useGame] = createContextHook(() => {
       }
     });
 
-    if (competition && competition.codigo_grupo) {
-      const roundId = competition.codigo_grupo;
+    if (competition && competition.groupCode) {
+      const roundId = competition.groupCode;
       const playerHoleScores = Array.from(playerScoresMap.values()).flatMap((ps) =>
         ps.scores.filter((s) => s.holeNumber === holeNumber)
       );
@@ -288,7 +288,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
   }, [playerScoresMap]);
 
   const leaderboard = useMemo(() => {
-    const players = competition?.jugadores || [];
+    const players = competition?.players || [];
     return players
       .map((player) => {
         const scores = playerScoresMap.get(player.id);
@@ -314,8 +314,8 @@ export const [GameProvider, useGame] = createContextHook(() => {
 
   const finishCompetition = useCallback(async () => {
     if (!competition) return;
-    if (competition.codigo_grupo) {
-      await syncEngine.record('ROUND_FINISHED', { round_id: competition.codigo_grupo }, competition.codigo_grupo).catch(() => {});
+    if (competition.groupCode) {
+      await syncEngine.record('ROUND_FINISHED', { round_id: competition.groupCode }, competition.groupCode).catch(() => {});
       await syncEngine.flush().catch((error) => {
         console.error('Error syncing results:', error);
       });

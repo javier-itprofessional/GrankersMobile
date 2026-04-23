@@ -15,10 +15,10 @@ export default function LeaderboardScreen() {
   const isFreePlayMode = gameStarted;
   
   const competition = isCompetitionMode ? competitionData : (isFreePlayMode ? {
-    codigo_grupo: '',
-    nombre_competicion: 'Partida Libre',
-    nombre_prueba: 'Partida Libre',
-    jugadores: players,
+    groupCode: '',
+    competitionName: 'Partida Libre',
+    eventName: 'Partida Libre',
+    players,
   } : null);
   
   const leaderboard = isCompetitionMode ? compLeaderboard : freeLeaderboard;
@@ -48,8 +48,8 @@ export default function LeaderboardScreen() {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Trophy size={48} color={Colors.golf.primary} />
-          <Text style={styles.title}>{competition.nombre_prueba}</Text>
-          <Text style={styles.subtitle}>{competition.nombre_competicion}</Text>
+          <Text style={styles.title}>{competition.eventName}</Text>
+          <Text style={styles.subtitle}>{competition.competitionName}</Text>
         </View>
 
         <View style={styles.leaderboard}>
@@ -76,7 +76,7 @@ export default function LeaderboardScreen() {
 
                 <View style={styles.playerInfo}>
                   <Text style={[styles.playerName, isLeader && styles.playerNameLeader]}>
-                    {entry.player.nombre} {entry.player.apellido}
+                    {entry.player.firstName} {entry.player.lastName}
                   </Text>
                   <Text style={styles.holesCompleted}>
                     {entry.holesCompleted} de 18 hoyos

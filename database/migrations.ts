@@ -1,14 +1,54 @@
-import { schemaMigrations, addColumns, createTable } from '@nozbe/watermelondb/Schema/migrations';
+import { schemaMigrations, addColumns, createTable, unsafeExecuteSql } from '@nozbe/watermelondb/Schema/migrations';
 
 // prettier-ignore
 
 export default schemaMigrations({
   migrations: [
-    // ─── v4: caché de competiciones, jugadores, leaderboard, adjuntos, rankings ─
+    // ─── v5: rename all Spanish column names to English ───────────────────────
+    {
+      toVersion: 5,
+      steps: [
+        // rounds
+        unsafeExecuteSql('ALTER TABLE rounds RENAME COLUMN codigo_grupo TO group_code;'),
+        unsafeExecuteSql('ALTER TABLE rounds RENAME COLUMN nombre_competicion TO competition_name;'),
+        unsafeExecuteSql('ALTER TABLE rounds RENAME COLUMN nombre_prueba TO event_name;'),
+        unsafeExecuteSql('ALTER TABLE rounds RENAME COLUMN fecha TO date;'),
+        // round_players
+        unsafeExecuteSql('ALTER TABLE round_players RENAME COLUMN nombre TO first_name;'),
+        unsafeExecuteSql('ALTER TABLE round_players RENAME COLUMN apellido TO last_name;'),
+        unsafeExecuteSql('ALTER TABLE round_players RENAME COLUMN licencia TO license;'),
+        unsafeExecuteSql('ALTER TABLE round_players RENAME COLUMN estado TO status;'),
+        // hole_scores
+        unsafeExecuteSql('ALTER TABLE hole_scores RENAME COLUMN conflict_score_marcador TO conflict_score_marker;'),
+        // courses
+        unsafeExecuteSql('ALTER TABLE courses RENAME COLUMN nombre TO name;'),
+        unsafeExecuteSql('ALTER TABLE courses RENAME COLUMN ciudad TO city;'),
+        unsafeExecuteSql('ALTER TABLE courses RENAME COLUMN pais TO country;'),
+        // routes
+        unsafeExecuteSql('ALTER TABLE routes RENAME COLUMN nombre TO name;'),
+        unsafeExecuteSql('ALTER TABLE routes RENAME COLUMN num_hoyos TO num_holes;'),
+        // holes
+        unsafeExecuteSql('ALTER TABLE holes RENAME COLUMN distancia_metros TO distance_meters;'),
+        unsafeExecuteSql('ALTER TABLE holes RENAME COLUMN distancia_yards TO distance_yards;'),
+        // tour_events
+        unsafeExecuteSql('ALTER TABLE tour_events RENAME COLUMN nombre_competicion TO competition_name;'),
+        unsafeExecuteSql('ALTER TABLE tour_events RENAME COLUMN nombre_prueba TO event_name;'),
+        unsafeExecuteSql('ALTER TABLE tour_events RENAME COLUMN fecha TO date;'),
+        unsafeExecuteSql('ALTER TABLE tour_events RENAME COLUMN hora_salida TO tee_time;'),
+        unsafeExecuteSql('ALTER TABLE tour_events RENAME COLUMN formato TO format;'),
+        unsafeExecuteSql('ALTER TABLE tour_events RENAME COLUMN codigo_grupo TO group_code;'),
+        unsafeExecuteSql('ALTER TABLE tour_events RENAME COLUMN campo TO course_name;'),
+        unsafeExecuteSql('ALTER TABLE tour_events RENAME COLUMN recorrido TO route_name;'),
+        // players_cache
+        unsafeExecuteSql('ALTER TABLE players_cache RENAME COLUMN nombre TO first_name;'),
+        unsafeExecuteSql('ALTER TABLE players_cache RENAME COLUMN apellido TO last_name;'),
+        unsafeExecuteSql('ALTER TABLE players_cache RENAME COLUMN licencia TO license;'),
+      ],
+    },
+    // ─── v4: competition/player/leaderboard/media/rankings cache tables ───────
     {
       toVersion: 4,
       steps: [
-        // Nuevas columnas en tablas existentes
         addColumns({
           table: 'rounds',
           columns: [
@@ -27,7 +67,6 @@ export default schemaMigrations({
             { name: 'strokes_net', type: 'number', isOptional: true },
           ],
         }),
-        // Nuevas tablas
         createTable({
           name: 'tour_events',
           columns: [
