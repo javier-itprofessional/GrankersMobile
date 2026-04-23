@@ -173,7 +173,7 @@ export async function linkDeviceToCompetitionPlayer(
 export async function updatePlayerConnectionStatus(
   groupCode: string,
   playerId: string,
-  status: 'connected' | 'offline'
+  status: 'not_started' | 'ready' | 'playing' | 'finished' | 'withdrawn'
 ): Promise<void> {
   await apiRequest<void>(
     `/api/v1/competitions/${encodeURIComponent(groupCode)}/players/${encodeURIComponent(playerId)}/status/`,

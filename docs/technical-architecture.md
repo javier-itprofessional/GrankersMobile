@@ -204,7 +204,7 @@ apiRequest<T>(path: string, options?: RequestInit): Promise<T>
 ]
 ```
 
-> La capa de transformación en `services/course-service.ts` convierte los campos del backend (`number`, `distance`) a los tipos internos (`hole_number`, `distance_meters`).
+> La capa de transformación en `services/course-service.ts` convierte los campos del backend (`number`, `distance`) a los tipos internos (`hole_number`, `distance_meters`). Campo `distance` en metros únicamente — `distance_yards` no soportado.
 
 > Los campos se cachean localmente durante **24 horas** en WatermelonDB (`courses`, `routes`, `holes`).
 
@@ -682,9 +682,12 @@ El leaderboard llega por WebSocket (`leaderboard_updated`). Si el WS no está di
 
 **Correcciones de contrato (bugs reales)**
 
-- `services/course-service.ts` — Añadidos wire types (`WireHoleData`, `WireRouteData`, `WireCourseData`). El backend devuelve `number`/`distance`; la capa de transformación convierte a `hole_number`/`distance_meters` internamente. `listCourses()` y `fetchAndCache()` actualizados.
-- `services/game-service.ts` — `listFreePlayGames` eliminado parámetro `?route=` (backend no lo soporta). `getActiveGamePlayers` tipado correctamente con `WireActivePlayer`; la transformación de wire se hace en el servicio, no en la pantalla.
-- `app/free-play/waiting-players.tsx` — Handler WS `player_status_changed` corregido: status `'conectado'` → `'ready' | 'playing'`; matching de jugador por `player_id` en vez de índice de array; eliminado `payload.player_uuid` (no existe en spec).
+- `services/course-service.ts` — Wire types (`WireHoleData`, `WireRouteData`, `WireCourseData`). Backend devuelve `number`/`distance`; capa de transformación convierte a `hole_number`/`distance_meters`. `distance_yards` eliminado (backend envía un único campo `distance` en metros). `listCourses()` y `fetchAndCache()` actualizados.
+- `services/game-service.ts` — `listFreePlayGames` eliminado `?route=` (backend no lo soporta). `getActiveGamePlayers` tipado con `WireActivePlayer`. `updatePlayerConnectionStatus` acepta ahora los status correctos del spec (`not_started | ready | playing | finished | withdrawn`).
+- `app/competition/waiting-players.tsx` — Llamada a `updatePlayerConnectionStatus` corregida: `'offline'` → `'withdrawn'`.
+- `app/free-play/waiting-players.tsx` — Handler WS `player_status_changed` corregido: `'conectado'` → `'ready' | 'playing'`; matching por `player_id`; eliminado `payload.player_uuid` inexistente.
+- `components/SearchResultCard.tsx` — Añadido avatar con iniciales (fallback mientras `avatar_url` es null en backend).
+- `app/index.tsx` — Comentario TODO marcando el cambio pendiente de `hoyo_${i}` → `hole_${i}` y `golpes_jugador` → `player_strokes` (espera migración backend Phase 7).
 
 **Renombrado de identificadores internos a inglés** (sin cambios en wire protocol)
 

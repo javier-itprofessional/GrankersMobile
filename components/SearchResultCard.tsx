@@ -18,12 +18,17 @@ export default function SearchResultCard({
   onPress,
   testID,
 }: SearchResultCardProps) {
+  const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+
   return (
     <TouchableOpacity
       style={styles.container}
       onPress={onPress}
       testID={testID}
     >
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>{initials}</Text>
+      </View>
       <View style={styles.info}>
         <Text style={styles.name}>
           {firstName} {lastName}
@@ -42,13 +47,31 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 4,
     elevation: 2,
   },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.golf.primary + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  avatarText: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: Colors.golf.primary,
+  },
   info: {
+    flex: 1,
     gap: 6,
   },
   name: {

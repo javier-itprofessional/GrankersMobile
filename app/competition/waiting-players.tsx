@@ -122,7 +122,7 @@ export default function CompetitionWaitingPlayersScreen() {
     if (groupCode && player.id) {
       try {
         if (newStatus === 'offline') {
-          await updatePlayerConnectionStatus(groupCode, player.id, 'offline');
+          await updatePlayerConnectionStatus(groupCode, player.id, 'withdrawn');
           console.log('[CompetitionWaiting] Player', player.id, 'marked as offline in Firebase');
         }
       } catch (error) {

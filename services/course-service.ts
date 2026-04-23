@@ -135,7 +135,6 @@ async function getFromCache(courseName: string, routeName: string): Promise<Rout
         par: h.par,
         handicap: h.handicap,
         distance_meters: h.distanceMeters ?? undefined,
-        distance_yards: h.distanceYards ?? undefined,
       })),
   };
 }
