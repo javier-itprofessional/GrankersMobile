@@ -2,7 +2,7 @@
 
 > Guía de integración para el equipo de backend  
 > React Native (Expo) · WatermelonDB · WebSocket  
-> Última actualización: 2026-04-22 — ver [Changelog](#changelog)
+> Última actualización: 2026-04-23 — ver [Changelog](#changelog)
 
 ---
 
@@ -12,7 +12,7 @@
 |------|-----------|---------|
 | Framework | Expo + React Native | Expo SDK ~53, RN 0.81.5 |
 | Routing | Expo Router (file-based) | ~6.0.23 |
-| Base de datos local | WatermelonDB (SQLite/JSI) | 0.27.0 |
+| Base de datos local | WatermelonDB (SQLite/JSI) — schema v5 | 0.27.0 |
 | Estado global | Zustand | 5.0.2 |
 | Estado servidor | TanStack React Query | 5.83.0 |
 | Peticiones HTTP | Fetch API (wrapper propio) | — |
@@ -55,8 +55,8 @@ GrankersMobile/
 │
 ├── database/               # WatermelonDB
 │   ├── index.ts            # Inicialización de la base de datos
-│   ├── schema.ts           # Schema v4 (14 tablas)
-│   ├── migrations.ts       # Migraciones incrementales v1→v4
+│   ├── schema.ts           # Schema v5 (14 tablas, columnas en inglés)
+│   ├── migrations.ts       # Migraciones incrementales v1→v5
 │   └── models/             # Modelos WatermelonDB
 │
 ├── lib/                    # Utilidades compartidas
@@ -383,7 +383,7 @@ El backend **debe ser idempotente por `id` de acción**. La app puede reenviar l
 wss://{EXPO_PUBLIC_WS_URL}/ws/round/{roundId}/?token={accessToken}
 ```
 
-- El `roundId` es el `codigo_grupo` en competición, o el ID local del round en free-play.
+- El `roundId` es el `id` del round en DB (`rounds.id`), tanto en competición como en free-play.
 - El token JWT se envía como query param (no en header, por limitación de la API de WebSocket nativa).
 - La app conecta al iniciar una ronda y desconecta al finalizarla.
 
@@ -455,7 +455,7 @@ wss://{EXPO_PUBLIC_WS_URL}/ws/round/{roundId}/?token={accessToken}
 }
 ```
 
-Status válidos: `preparado` | `conectado` | `no_presentado` | `pendiente`
+Status válidos: `not_started` | `ready` | `playing` | `finished` | `withdrawn`
 
 #### `round_finished`
 ```json
@@ -487,7 +487,7 @@ const adapter = new SQLiteAdapter({
 export const database = new Database({ adapter, modelClasses: [...] })
 ```
 
-### Schema version: 4
+### Schema version: 5
 
 | Tabla | Propósito |
 |-------|-----------|
@@ -664,7 +664,7 @@ Presente en **todas** las peticiones. Permite rastrear qué dispositivo físico 
 - `player_id` en `round_players` → FK a `players_cache.external_id` en local (puede ser null si no está en caché)
 
 ### WebSocket — `round_id`
-La app conecta al canal `/ws/round/{roundId}/`. En competición, `roundId` = `codigo_grupo`. El backend debe emitir eventos a ese canal cuando hay actualizaciones.
+La app conecta al canal `/ws/round/{roundId}/` usando el `id` del round (`rounds.id`). El backend debe emitir eventos a ese canal cuando hay actualizaciones.
 
 ### `tour_events` / `players_cache` / `rankings_cache`
 Estas tablas se rellenan mediante sync pull desde el backend. La app necesita endpoints (o incluirlos en la respuesta de `/api/v1/sync/`) para mantenerlas actualizadas.
@@ -675,6 +675,46 @@ El leaderboard llega por WebSocket (`leaderboard_updated`). Si el WS no está di
 ---
 
 ## Changelog
+
+### 2026-04-23 — Renombrado de identificadores internos a inglés
+
+**Cambio interno — no afecta al wire protocol con el backend.**
+
+El código TypeScript del cliente usa ahora inglés para todos los identificadores. El backend
+sigue enviando JSON en español en los endpoints de competición; `game-service.ts` aplica una
+capa de transformación en la frontera de la API.
+
+**Capa de transformación (`services/game-service.ts`)**
+
+- Interfaces wire añadidas: `WireCompetitionData`, `WirePlayer`, `WireActiveCompetition`, `WireLicensePlayer`
+- `fetchCompetitionData()` → transforma campos españoles del backend a `FirebaseCompetitionData` (inglés)
+- `findCompetitionByDeviceId()` → transforma a `FoundCompetitionSession` (inglés)
+- `searchPlayerLicenses()` → envía params en español (`licencia`, `nombre`, `apellido`, `codigo_grupo`); devuelve `LicensePlayer[]` en inglés
+- `saveFreePlayPlayers()` → mapea `firstName/lastName/license` → `nombre/apellido/licencia` para el request body
+
+**Tipos internos renombrados (`types/game.ts`)**
+
+| Antes | Después |
+|-------|---------|
+| `Competition.codigo_grupo` | `Competition.groupCode` |
+| `Competition.nombre_competicion` | `Competition.competitionName` |
+| `Competition.nombre_prueba` | `Competition.eventName` |
+| `Competition.jugadores` | `Competition.players` |
+| `Player.nombre` | `Player.firstName` |
+| `Player.apellido` | `Player.lastName` |
+| `Player.licencia` | `Player.license` |
+
+**Schema WatermelonDB v5**
+
+- Todas las columnas renombradas a inglés (migración v4→v5 en `migrations.ts`)
+- Modelos actualizados: `Round`, `RoundPlayer`, `HoleScore`, `ActionLog`, `PlayerCache`, `TourEvent`, `Course`, `Route`, `Hole`
+
+**WebSocket**
+
+- `player_status_changed.status` usa vocabulario inglés: `not_started | ready | playing | finished | withdrawn`
+- Canal WS: `rounds.id` (no `codigo_grupo`)
+
+---
 
 ### 2026-04-22 — Alineación con `mobile-sync-spec.md` v2.4.0
 
