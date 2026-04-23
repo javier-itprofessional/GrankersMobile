@@ -3,85 +3,92 @@ import { Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { UserPlus, Mail, Globe, FileText, ChevronRight, Check } from 'lucide-react-native';
+import { UserPlus, Mail, Globe, FileText, ChevronRight, Check, CheckCircle } from 'lucide-react-native';
 import Colors from '@/constants/colors';
-import { usePlayerAuth, PlayerSession } from '@/providers/PlayerAuthProvider';
+import { usePlayerAuth } from '@/providers/PlayerAuthProvider';
+import { register, loginWithGoogle } from '@/services/auth';
 
 export default function RegisterScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { saveSession } = usePlayerAuth();
+  const { reloadSession } = usePlayerAuth();
 
-  const [fullName, setFullName] = useState<string>('');
+  const [firstName, setFirstName] = useState<string>('');
+  const [lastName, setLastName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [country, setCountry] = useState<string>('');
   const [acceptedTerms, setAcceptedTerms] = useState<boolean>(false);
+  const [registered, setRegistered] = useState<boolean>(false);
 
   const googleRegisterMutation = useMutation({
     mutationFn: async () => {
-      console.log('[Register] Google register pressed');
-      const mockSession: PlayerSession = {
-        id: `google-${Date.now()}`,
-        name: 'Jugador Google',
-        email: 'jugador@gmail.com',
-        country: 'España',
-        authMethod: 'google',
-        createdAt: new Date().toISOString(),
-      };
-      await saveSession(mockSession);
-      return mockSession;
+      await loginWithGoogle();
+      await reloadSession();
     },
     onSuccess: () => {
-      console.log('[Register] Google register success');
       router.replace('/player-area');
     },
     onError: (error: Error) => {
       console.error('[Register] Google register error:', error);
-      Alert.alert('Error', 'No se pudo registrar con Google');
+      Alert.alert('Error', error.message || 'No se pudo registrar con Google');
     },
   });
 
   const emailRegisterMutation = useMutation({
     mutationFn: async () => {
-      if (!fullName.trim()) {
-        throw new Error('Por favor, introduce tu nombre completo');
-      }
-      if (!email.trim()) {
-        throw new Error('Por favor, introduce tu correo electrónico');
-      }
+      if (!firstName.trim()) throw new Error('Por favor, introduce tu nombre');
+      if (!lastName.trim()) throw new Error('Por favor, introduce tus apellidos');
+      if (!email.trim()) throw new Error('Por favor, introduce tu correo electrónico');
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email.trim())) {
-        throw new Error('Por favor, introduce un correo electrónico válido');
-      }
-      if (!country.trim()) {
-        throw new Error('Por favor, introduce tu país de residencia');
-      }
-      if (!acceptedTerms) {
-        throw new Error('Debes aceptar los términos de uso y la política de privacidad');
-      }
+      if (!emailRegex.test(email.trim())) throw new Error('Por favor, introduce un correo electrónico válido');
+      if (!country.trim()) throw new Error('Por favor, introduce tu país de residencia');
+      if (!acceptedTerms) throw new Error('Debes aceptar los términos de uso y la política de privacidad');
 
-      console.log('[Register] Email register with:', { fullName, email, country });
-      const newSession: PlayerSession = {
-        id: `email-${Date.now()}`,
-        name: fullName.trim(),
+      await register({
         email: email.trim(),
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
         country: country.trim(),
-        authMethod: 'email',
-        createdAt: new Date().toISOString(),
-      };
-      await saveSession(newSession);
-      return newSession;
+      });
     },
     onSuccess: () => {
-      console.log('[Register] Email register success');
-      router.replace('/player-area');
+      setRegistered(true);
     },
     onError: (error: Error) => {
       Alert.alert('Error', error.message);
     },
   });
 
-  const isFormValid = fullName.trim() && email.trim() && country.trim() && acceptedTerms;
+  const isFormValid = firstName.trim() && lastName.trim() && email.trim() && country.trim() && acceptedTerms;
+
+  if (registered) {
+    return (
+      <View style={styles.container}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={[styles.centeredContent, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 40 }]}>
+          <View style={styles.successIcon}>
+            <CheckCircle size={48} color={Colors.golf.primary} strokeWidth={1.5} />
+          </View>
+          <Text style={styles.successTitle}>¡Cuenta creada!</Text>
+          <Text style={styles.successSubtitle}>
+            Hemos enviado un enlace de activación a{'\n'}
+            <Text style={styles.emailHighlight}>{email}</Text>
+          </Text>
+          <Text style={styles.successHint}>
+            Haz clic en el enlace del email para activar tu cuenta e iniciar sesión.
+          </Text>
+          <TouchableOpacity
+            style={styles.loginButton}
+            onPress={() => router.replace('/player-area/login')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.loginButtonText}>Ir al inicio de sesión</Text>
+            <ChevronRight size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -137,19 +144,34 @@ export default function RegisterScreen() {
           </View>
 
           <View style={styles.sectionContainer}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.fieldLabel}>Nombre completo</Text>
-              <View style={styles.inputWrapper}>
-                <UserPlus size={18} color={Colors.golf.textLight} />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="Tu nombre y apellidos"
-                  placeholderTextColor="#AAAAAA"
-                  value={fullName}
-                  onChangeText={setFullName}
-                  autoCapitalize="words"
-                  testID="register-name-input"
-                />
+            <View style={styles.nameRow}>
+              <View style={[styles.inputGroup, styles.nameField]}>
+                <Text style={styles.fieldLabel}>Nombre</Text>
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Nombre"
+                    placeholderTextColor="#AAAAAA"
+                    value={firstName}
+                    onChangeText={setFirstName}
+                    autoCapitalize="words"
+                    testID="register-firstname-input"
+                  />
+                </View>
+              </View>
+              <View style={[styles.inputGroup, styles.nameField]}>
+                <Text style={styles.fieldLabel}>Apellidos</Text>
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Apellidos"
+                    placeholderTextColor="#AAAAAA"
+                    value={lastName}
+                    onChangeText={setLastName}
+                    autoCapitalize="words"
+                    testID="register-lastname-input"
+                  />
+                </View>
               </View>
             </View>
 
@@ -198,17 +220,11 @@ export default function RegisterScreen() {
               </View>
               <Text style={styles.termsText}>
                 Acepto los{' '}
-                <Text
-                  style={styles.termsLink}
-                  onPress={() => router.push('/player-area/terms')}
-                >
+                <Text style={styles.termsLink} onPress={() => router.push('/player-area/terms')}>
                   términos de uso
                 </Text>
                 {' '}y la{' '}
-                <Text
-                  style={styles.termsLink}
-                  onPress={() => router.push('/player-area/privacy')}
-                >
+                <Text style={styles.termsLink} onPress={() => router.push('/player-area/privacy')}>
                   política de privacidad
                 </Text>
               </Text>
@@ -257,6 +273,62 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 24,
     flexGrow: 1,
+  },
+  centeredContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    gap: 16,
+  },
+  successIcon: {
+    marginBottom: 8,
+  },
+  successTitle: {
+    fontSize: 26,
+    fontWeight: '700' as const,
+    color: Colors.golf.text,
+    textAlign: 'center',
+  },
+  successSubtitle: {
+    fontSize: 15,
+    fontWeight: '400' as const,
+    color: Colors.golf.textLight,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  emailHighlight: {
+    fontWeight: '600' as const,
+    color: Colors.golf.text,
+  },
+  successHint: {
+    fontSize: 13,
+    fontWeight: '400' as const,
+    color: Colors.golf.textLight,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  loginButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.golf.primary,
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 28,
+    gap: 8,
+    marginTop: 8,
+    shadowColor: Colors.golf.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  loginButtonText: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
   },
   topSection: {
     alignItems: 'center',
@@ -352,6 +424,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500' as const,
     color: Colors.golf.textLight,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  nameField: {
+    flex: 1,
   },
   inputGroup: {
     gap: 6,

@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { Users, Lock, Unlock, ArrowRight, X } from 'lucide-react-native';
 import Colors from '../../constants/colors';
-import { createFreePlayGame, addGroupToExistingGame } from '@/config/firebase';
+import { createFreePlayGame, addGroupToExistingGame } from '@/services/game-service';
 
 export default function CreateGameScreen() {
   const router = useRouter();

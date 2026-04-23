@@ -31,16 +31,16 @@ export default function CompetitionScoringScreen() {
 
   const marcandoPlayerId = useMemo(() => {
     if (!competition || !currentDevicePlayerId) return null;
-    const jugadores = competition.jugadores;
-    const myIndex = jugadores.findIndex(p => p.id === currentDevicePlayerId);
+    const players = competition.players;
+    const myIndex = players.findIndex(p => p.id === currentDevicePlayerId);
     if (myIndex === -1) return null;
-    const nextIndex = (myIndex + 1) % jugadores.length;
-    return jugadores[nextIndex].id;
+    const nextIndex = (myIndex + 1) % players.length;
+    return players[nextIndex].id;
   }, [competition, currentDevicePlayerId]);
 
   const sortedPlayers = useMemo(() => {
     if (!competition) return [];
-    const allPlayers = competition.jugadores.filter(
+    const allPlayers = competition.players.filter(
       (player) => scoringMode === 'all' || visiblePlayerIds.includes(player.id)
     );
     if (!marcandoPlayerId || !currentDevicePlayerId) return allPlayers;
@@ -205,8 +205,8 @@ export default function CompetitionScoringScreen() {
           onPress={handlePruebaPress}
           testID="prueba-button"
         >
-          <Text style={styles.competitionName}>{competition.nombre_competicion}</Text>
-          <Text style={styles.pruebaText}>{competition.nombre_prueba}</Text>
+          <Text style={styles.competitionName}>{competition.competitionName}</Text>
+          <Text style={styles.pruebaText}>{competition.eventName}</Text>
         </TouchableOpacity>
 
         <View style={styles.holeRow}>
@@ -285,7 +285,7 @@ export default function CompetitionScoringScreen() {
                   {isMarcando && <View style={styles.marcandoDot} />}
                   {isMe && <View style={styles.meDot} />}
                   <Text style={[styles.playerName, isMe && styles.playerNameMe, isMarcando && styles.playerNameMarcando]} numberOfLines={1}>
-                    {player.nombre} {player.apellido}
+                    {player.firstName} {player.lastName}
                   </Text>
                   {isMe && <Text style={styles.tagMe}>Tú</Text>}
                   {isMarcando && <Text style={styles.tagMarcando}>Marcando</Text>}

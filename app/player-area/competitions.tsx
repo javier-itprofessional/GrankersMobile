@@ -4,10 +4,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Calendar, ClipboardList, ChevronRight, Trophy, Clock, MapPin, Navigation } from 'lucide-react-native';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import Colors from '@/constants/colors';
-import { fetchProximaCompeticion, fetchCompetitionData, linkDeviceToCompetitionPlayer } from '@/config/firebase';
+import { fetchUpcomingCompetition, fetchCompetitionData, linkDeviceToCompetitionPlayer } from '@/services/game-service';
 import * as Application from 'expo-application';
 import { useCompetition } from '@/providers/CompetitionProvider';
-import type { ProximaCompeticion } from '@/config/firebase';
+import type { UpcomingCompetition, FirebaseCompetitionData } from '@/services/game-service';
+import type { Competition } from '@/types/game';
 
 interface MenuItemProps {
   icon: React.ReactNode;
@@ -31,7 +32,7 @@ function MenuItem({ icon, title, subtitle, onPress }: MenuItemProps) {
   );
 }
 
-function NextCompetitionCard({ data }: { data: ProximaCompeticion }) {
+function NextCompetitionCard({ data }: { data: UpcomingCompetition }) {
   const router = useRouter();
   const { startCompetition } = useCompetition();
 
@@ -40,32 +41,30 @@ function NextCompetitionCard({ data }: { data: ProximaCompeticion }) {
   const teeButtonMutation = useMutation({
     mutationFn: async () => {
       console.log('[Competitions] Estoy en el tee pressed');
-      console.log('[Competitions] Loading competition with id_grupo:', data.id_grupo);
+      console.log('[Competitions] Loading competition with group_id:', data.group_id);
 
-      const competitionData = await fetchCompetitionData(data.id_grupo);
+      const competitionData = await fetchCompetitionData(data.group_id);
 
       if (!competitionData) {
         throw new Error('No se encontró la competición');
       }
 
-      const myLicencia = data.numero_licencia || data.id_jugador || '';
-      console.log('[Competitions] My licencia (numero_licencia):', myLicencia);
-      console.log('[Competitions] id_jugador fallback:', data.id_jugador);
-      console.log('[Competitions] numero_licencia:', data.numero_licencia);
+      const myLicense = data.player_license || data.player_id || '';
+      console.log('[Competitions] My license:', myLicense);
 
-      const myPlayer = competitionData.jugadores.find(
-        (j) => j.licencia && j.licencia.trim().toLowerCase() === myLicencia.trim().toLowerCase()
+      const myPlayer = competitionData.players.find(
+        (j) => j.license && j.license.trim().toLowerCase() === myLicense.trim().toLowerCase()
       );
 
       if (!myPlayer) {
-        console.error('[Competitions] No player found matching licencia:', myLicencia);
-        console.error('[Competitions] Available players and their licencias:', 
-          competitionData.jugadores.map(j => ({ id: j.id, licencia: j.licencia }))
+        console.error('[Competitions] No player found matching license:', myLicense);
+        console.error('[Competitions] Available players:',
+          competitionData.players.map(j => ({ id: j.id, license: j.license }))
         );
         throw new Error('No se encontró tu jugador en la competición');
       }
 
-      console.log('[Competitions] Found my player:', myPlayer.id, myPlayer.nombre, myPlayer.apellido);
+      console.log('[Competitions] Found my player:', myPlayer.id, myPlayer.first_name, myPlayer.last_name);
 
       let deviceId: string;
       if (Platform.OS === 'web') {
@@ -94,7 +93,7 @@ function NextCompetitionCard({ data }: { data: ProximaCompeticion }) {
       console.log('[Competitions] Device ID:', deviceId);
 
       try {
-        await linkDeviceToCompetitionPlayer(data.id_grupo, myPlayer.id, deviceId);
+        await linkDeviceToCompetitionPlayer(data.group_id, myPlayer.id, deviceId);
         console.log('[Competitions] Device linked to player successfully');
       } catch (linkError) {
         console.error('[Competitions] Error linking device, continuing anyway:', linkError);
@@ -106,7 +105,18 @@ function NextCompetitionCard({ data }: { data: ProximaCompeticion }) {
     },
     onSuccess: ({ competitionData, myPlayerId }) => {
       console.log('[Competitions] Competition loaded, navigating to waiting-players');
-      startCompetition(competitionData);
+      const comp: Competition = {
+        groupCode: competitionData.group_code,
+        competitionName: competitionData.competition_name,
+        eventName: competitionData.event_name,
+        courseName: competitionData.course_name,
+        routeName: competitionData.route_name,
+        players: competitionData.players.map((p) => ({
+          id: p.id, firstName: p.first_name, lastName: p.last_name,
+          license: p.license, handicap: p.handicap,
+        })),
+      };
+      startCompetition(comp);
 
       router.push({
         pathname: '/competition/waiting-players',
@@ -131,26 +141,26 @@ function NextCompetitionCard({ data }: { data: ProximaCompeticion }) {
         </View>
       </View>
 
-      <Text style={styles.nextCompName}>{data.nombre_competicion}</Text>
+      <Text style={styles.nextCompName}>{data.competition_name}</Text>
 
       <View style={styles.nextCompDivider} />
 
       <View style={styles.nextCompInfoRow}>
         <MapPin size={16} color={Colors.golf.primary} />
         <Text style={styles.nextCompInfoLabel}>Prueba</Text>
-        <Text style={styles.nextCompInfoValue}>{data.nombre_prueba}</Text>
+        <Text style={styles.nextCompInfoValue}>{data.event_name}</Text>
       </View>
 
       <View style={styles.nextCompInfoRow}>
         <Calendar size={16} color={Colors.golf.primary} />
         <Text style={styles.nextCompInfoLabel}>Fecha</Text>
-        <Text style={styles.nextCompInfoValue}>{data.fecha}</Text>
+        <Text style={styles.nextCompInfoValue}>{data.date}</Text>
       </View>
 
       <View style={styles.nextCompInfoRow}>
         <Clock size={16} color={Colors.golf.primary} />
         <Text style={styles.nextCompInfoLabel}>Hora de salida</Text>
-        <Text style={styles.nextCompInfoValue}>{data.hora_salida}</Text>
+        <Text style={styles.nextCompInfoValue}>{data.tee_time}</Text>
       </View>
 
       <TouchableOpacity
@@ -179,7 +189,7 @@ export default function CompetitionsScreen() {
 
   const proximaQuery = useQuery({
     queryKey: ['proxima-competicion'],
-    queryFn: fetchProximaCompeticion,
+    queryFn: fetchUpcomingCompetition,
   });
 
   return (

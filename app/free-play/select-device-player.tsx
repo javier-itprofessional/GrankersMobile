@@ -5,8 +5,7 @@ import { useState, useEffect } from 'react';
 import * as Application from 'expo-application';
 import Colors from '../../constants/colors';
 import { useFreePlay } from '../../providers/FreePlayProvider';
-import { linkDeviceToPlayer, database } from '@/config/firebase';
-import { ref, get, child } from 'firebase/database';
+import { linkDeviceToPlayer, getActiveGamePlayers } from '@/services/game-service';
 
 export default function SelectDevicePlayerScreen() {
   const router = useRouter();
@@ -82,48 +81,33 @@ export default function SelectDevicePlayerScreen() {
   const fetchUnassignedPlayers = async (currentDeviceId: string) => {
     try {
       console.log('[SelectDevicePlayer] Fetching players with device assignments...');
-      const groupPlayersPath = `pachangas_activas/${params.courseName}/${params.routeName}/${params.gameName}/${params.groupName}/jugadores`;
-      console.log('[SelectDevicePlayer] Path:', groupPlayersPath);
-      
-      const snapshot = await get(child(ref(database), groupPlayersPath));
-      
-      if (!snapshot.exists()) {
-        console.log('[SelectDevicePlayer] No players found in Firebase');
+
+      const gamePlayers = await getActiveGamePlayers(
+        params.courseName ?? '',
+        params.routeName ?? '',
+        params.gameName ?? '',
+        params.groupName ?? ''
+      );
+
+      if (!gamePlayers) {
+        console.log('[SelectDevicePlayer] No players found in backend');
         setUnassignedPlayers(players);
         setIsLoading(false);
         return;
       }
 
-      const firebasePlayers = snapshot.val();
-      console.log('[SelectDevicePlayer] Firebase players:', firebasePlayers);
-      
       const unassigned: any[] = [];
-      let maxHole = 1;
-      
+
       players.forEach((player: any, index: number) => {
         const playerKey = `jugador_${String(index + 1).padStart(2, '0')}`;
-        const fbPlayer = firebasePlayers[playerKey];
-        
-        console.log(`[SelectDevicePlayer] Checking player ${playerKey}:`, fbPlayer);
-        
-        if (!fbPlayer || !fbPlayer.deviceId) {
+        const backendPlayer = gamePlayers[playerKey];
+
+        if (!backendPlayer || !backendPlayer.deviceId) {
           unassigned.push(player);
-          console.log(`[SelectDevicePlayer] Player ${playerKey} is unassigned`);
-        } else {
-          console.log(`[SelectDevicePlayer] Player ${playerKey} has deviceId:`, fbPlayer.deviceId);
-          
-          for (let i = 1; i <= 18; i++) {
-            const holeKey = `hoyo_${i}`;
-            if (fbPlayer[holeKey]) {
-              maxHole = Math.max(maxHole, i);
-            }
-          }
         }
       });
 
       console.log('[SelectDevicePlayer] Unassigned players:', unassigned);
-      console.log('[SelectDevicePlayer] Current hole (max from other players):', maxHole);
-      setCurrentHole(maxHole);
       setUnassignedPlayers(unassigned);
 
       if (unassigned.length === 1) {
@@ -203,15 +187,15 @@ export default function SelectDevicePlayerScreen() {
       setGameInfo(params.gameName, params.groupName);
       setDevicePlayer(playerId);
       
-      const playersWithIds = players.map((p: { id: string; nombre: string; apellido: string; handicap: string; licencia?: string }) => ({
+      const playersWithIds = players.map((p: { id: string; firstName: string; lastName: string; handicap: string; license?: string }) => ({
         id: p.id,
-        nombre: p.nombre,
-        apellido: p.apellido,
-        licencia: p.licencia,
+        firstName: p.firstName,
+        lastName: p.lastName,
+        license: p.license,
         handicap: p.handicap ? parseFloat(p.handicap) : 0,
         isDevice: p.id === playerId,
       }));
-      
+
       startFreePlay(playersWithIds);
       
       if (currentHole > 1) {
@@ -245,11 +229,11 @@ export default function SelectDevicePlayerScreen() {
           {
             text: 'Continuar',
             onPress: () => {
-              const playersWithIds = players.map((p: { id: string; nombre: string; apellido: string; handicap: string; licencia?: string }) => ({
+              const playersWithIds = players.map((p: { id: string; firstName: string; lastName: string; handicap: string; license?: string }) => ({
                 id: p.id,
-                nombre: p.nombre,
-                apellido: p.apellido,
-                licencia: p.licencia,
+                firstName: p.firstName,
+                lastName: p.lastName,
+                license: p.license,
                 handicap: p.handicap ? parseFloat(p.handicap) : 0,
                 isDevice: p.id === playerId,
               }));
@@ -311,7 +295,7 @@ export default function SelectDevicePlayerScreen() {
           </View>
 
           <View style={styles.playersContainer}>
-            {unassignedPlayers.map((player: { id: string; nombre: string; apellido: string; handicap?: string }) => (
+            {unassignedPlayers.map((player: { id: string; firstName: string; lastName: string; handicap?: string }) => (
               <TouchableOpacity
                 key={player.id}
                 style={[styles.playerButton, isLinking && styles.playerButtonDisabled]}
@@ -321,7 +305,7 @@ export default function SelectDevicePlayerScreen() {
               >
                 <View style={styles.playerInfo}>
                   <Text style={styles.playerName}>
-                    {player.nombre} {player.apellido}
+                    {player.firstName} {player.lastName}
                   </Text>
                   {player.handicap && (
                     <Text style={styles.playerHandicap}>

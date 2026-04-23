@@ -4,7 +4,7 @@ import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { Users } from 'lucide-react-native';
 import Colors from '../../constants/colors';
 import { useFreePlay } from '../../providers/FreePlayProvider';
-import { saveFreePlayPlayers } from '@/config/firebase';
+import { saveFreePlayPlayers } from '@/services/game-service';
 import PlayerCard from '../../components/PlayerCard';
 
 
@@ -14,9 +14,9 @@ export default function FreePlaySetupScreen() {
     numberOfPlayers?: string;
     selectedPlayerIndex?: string;
     selectedPlayerId?: string;
-    selectedPlayerNombre?: string;
-    selectedPlayerApellido?: string;
-    selectedPlayerLicencia?: string;
+    selectedPlayerFirstName?: string;
+    selectedPlayerLastName?: string;
+    selectedPlayerLicense?: string;
     selectedPlayerHandicap?: string;
     existingPlayers?: string;
     courseName?: string;
@@ -27,7 +27,7 @@ export default function FreePlaySetupScreen() {
     gamePassword?: string;
   }>();
   const { resetFreePlay, setCourseInfo } = useFreePlay();
-  const [players, setPlayers] = useState<{ id: string; nombre: string; apellido: string; licencia?: string; handicap?: string }[]>([]);
+  const [players, setPlayers] = useState<{ id: string; firstName: string; lastName: string; license?: string; handicap?: string }[]>([]);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const initializedRef = useRef(false);
 
@@ -44,9 +44,9 @@ export default function FreePlaySetupScreen() {
           const numberOfPlayers = parseInt(params.numberOfPlayers, 10);
           initialPlayers = Array.from({ length: numberOfPlayers }, (_, i) => ({
             id: `${i + 1}`,
-            nombre: '',
-            apellido: '',
-            licencia: undefined,
+            firstName: '',
+            lastName: '',
+            license: undefined,
             handicap: undefined,
           }));
         }
@@ -54,9 +54,9 @@ export default function FreePlaySetupScreen() {
         const numberOfPlayers = parseInt(params.numberOfPlayers, 10);
         initialPlayers = Array.from({ length: numberOfPlayers }, (_, i) => ({
           id: `${i + 1}`,
-          nombre: '',
-          apellido: '',
-          licencia: undefined,
+          firstName: '',
+          lastName: '',
+          license: undefined,
           handicap: undefined,
         }));
         console.log('[Setup] Initializing new players:', initialPlayers);
@@ -70,18 +70,18 @@ export default function FreePlaySetupScreen() {
   useEffect(() => {
     const selectedPlayerId = params.selectedPlayerId;
     const selectedIndex = params.selectedPlayerIndex;
-    const selectedNombre = params.selectedPlayerNombre;
-    const selectedApellido = params.selectedPlayerApellido;
-    const selectedLicencia = params.selectedPlayerLicencia;
+    const selectedFirstName = params.selectedPlayerFirstName;
+    const selectedLastName = params.selectedPlayerLastName;
+    const selectedLicense = params.selectedPlayerLicense;
     const selectedHandicap = params.selectedPlayerHandicap;
 
-    if (selectedNombre && selectedApellido && selectedIndex) {
+    if (selectedFirstName && selectedLastName && selectedIndex) {
       console.log('=== UPDATING PLAYER DATA ===');
       console.log('Player ID:', selectedPlayerId);
       console.log('Player Index:', selectedIndex);
-      console.log('Nombre:', selectedNombre);
-      console.log('Apellido:', selectedApellido);
-      console.log('Licencia:', selectedLicencia);
+      console.log('First name:', selectedFirstName);
+      console.log('Last name:', selectedLastName);
+      console.log('License:', selectedLicense);
       console.log('Handicap:', selectedHandicap);
       console.log('Current players before update:', JSON.stringify(players));
       
@@ -96,9 +96,9 @@ export default function FreePlaySetupScreen() {
           
           updated[targetIndex] = {
             ...updated[targetIndex],
-            nombre: selectedNombre,
-            apellido: selectedApellido,
-            licencia: selectedLicencia,
+            firstName: selectedFirstName,
+            lastName: selectedLastName,
+            license: selectedLicense,
             handicap: selectedHandicap,
           };
           
@@ -111,17 +111,17 @@ export default function FreePlaySetupScreen() {
       });
         
       setTimeout(() => {
-        router.setParams({ 
+        router.setParams({
           selectedPlayerIndex: undefined,
           selectedPlayerId: undefined,
-          selectedPlayerNombre: undefined,
-          selectedPlayerApellido: undefined,
-          selectedPlayerLicencia: undefined,
+          selectedPlayerFirstName: undefined,
+          selectedPlayerLastName: undefined,
+          selectedPlayerLicense: undefined,
           selectedPlayerHandicap: undefined,
         });
       }, 100);
     }
-  }, [params.selectedPlayerIndex, params.selectedPlayerId, params.selectedPlayerNombre, params.selectedPlayerApellido, params.selectedPlayerLicencia, params.selectedPlayerHandicap, router]);
+  }, [params.selectedPlayerIndex, params.selectedPlayerId, params.selectedPlayerFirstName, params.selectedPlayerLastName, params.selectedPlayerLicense, params.selectedPlayerHandicap, router]);
 
 
 
@@ -131,7 +131,7 @@ export default function FreePlaySetupScreen() {
 
 
 
-  const handleUpdatePlayer = (id: string, field: 'nombre' | 'apellido' | 'handicap', value: string) => {
+  const handleUpdatePlayer = (id: string, field: 'firstName' | 'lastName' | 'handicap', value: string) => {
     setPlayers(players.map((p) => (p.id === id ? { ...p, [field]: value } : p)));
   };
 
@@ -140,9 +140,9 @@ export default function FreePlaySetupScreen() {
   const handleSearchLicense = (playerIndex: string) => {
     const allPlayersData = players.map(p => ({
       id: p.id,
-      nombre: p.nombre,
-      apellido: p.apellido,
-      licencia: p.licencia || '',
+      firstName: p.firstName,
+      lastName: p.lastName,
+      license: p.license || '',
       handicap: p.handicap || '',
     }));
     
@@ -161,7 +161,7 @@ export default function FreePlaySetupScreen() {
   };
 
   const handleNext = async () => {
-    const validPlayers = players.filter((p) => p.nombre.trim() && p.apellido.trim());
+    const validPlayers = players.filter((p) => p.firstName.trim() && p.lastName.trim());
     
     if (validPlayers.length === 0) {
       Alert.alert('Error', 'Debes añadir al menos un jugador con nombre y apellido');
@@ -201,10 +201,10 @@ export default function FreePlaySetupScreen() {
     
     const playersData = validPlayers.map(p => ({
       id: p.id,
-      nombre: p.nombre,
-      apellido: p.apellido,
+      firstName: p.firstName,
+      lastName: p.lastName,
       handicap: p.handicap || '0',
-      licencia: p.licencia,
+      license: p.license,
     }));
     
     console.log('[FreePlay] Players data to save:', JSON.stringify(playersData, null, 2));
@@ -250,7 +250,7 @@ export default function FreePlaySetupScreen() {
     proceedToNextScreen(playersData);
   };
   
-  const proceedToNextScreen = (playersData: { id: string; nombre: string; apellido: string; handicap: string; licencia?: string }[]) => {
+  const proceedToNextScreen = (playersData: { id: string; firstName: string; lastName: string; handicap: string; license?: string }[]) => {
     router.push({
       pathname: '/free-play/select-device-player',
       params: {
@@ -293,14 +293,14 @@ export default function FreePlaySetupScreen() {
             <PlayerCard
               key={player.id}
               index={index}
-              nombre={player.nombre}
-              apellido={player.apellido}
-              licencia={player.licencia}
+              firstName={player.firstName}
+              lastName={player.lastName}
+              license={player.license}
               handicap={player.handicap}
-              estado={undefined}
+              status={undefined}
               isCompetition={false}
-              onChangeNombre={(text) => handleUpdatePlayer(player.id, 'nombre', text)}
-              onChangeApellido={(text) => handleUpdatePlayer(player.id, 'apellido', text)}
+              onChangeFirstName={(text) => handleUpdatePlayer(player.id, 'firstName', text)}
+              onChangeLastName={(text) => handleUpdatePlayer(player.id, 'lastName', text)}
               onChangeHandicap={(text) => handleUpdatePlayer(player.id, 'handicap', text)}
               onSearchLicense={() => handleSearchLicense(`${index + 1}`)}
               onMarkReady={() => {}}

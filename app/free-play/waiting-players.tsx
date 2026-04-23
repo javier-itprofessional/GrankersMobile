@@ -2,13 +2,14 @@ import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'rea
 import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { Users, Check, WifiOff, Square, CheckSquare } from 'lucide-react-native';
 import { useState, useEffect } from 'react';
-import { ref, onValue } from 'firebase/database';
 import Colors from '../../constants/colors';
-import { database } from '@/config/firebase';
+import { wsClient } from '@/services/websocket';
+import { useFreePlay } from '@/providers/FreePlayProvider';
 
 interface PlayerStatus {
-  nombre: string;
-  apellido: string;
+  id: string;
+  firstName: string;
+  lastName: string;
   deviceId?: string;
 }
 
@@ -36,63 +37,40 @@ export default function WaitingPlayersScreen() {
     return () => clearTimeout(timer);
   }, []);
 
+  const { players: freePlayPlayers, activeRoundId } = useFreePlay();
+
+  // Initialize player list from FreePlayProvider
   useEffect(() => {
-    if (!params.courseName || !params.routeName || !params.gameName || !params.groupName) {
-      console.log('[WaitingPlayers] Missing game parameters');
-      return;
+    if (freePlayPlayers.length > 0) {
+      const list: PlayerStatus[] = freePlayPlayers.map((p) => ({
+        id: p.id,
+        firstName: p.firstName,
+        lastName: p.lastName,
+        deviceId: p.isDevice ? 'local' : undefined,
+      }));
+      setPlayersStatus(list);
+      setConnectedCount(list.filter((p) => p.deviceId).length);
     }
+  }, [freePlayPlayers]);
 
-    const groupPlayersPath = `pachangas_activas/${params.courseName}/${params.routeName}/${params.gameName}/${params.groupName}/jugadores`;
-    console.log('[WaitingPlayers] Listening to path:', groupPlayersPath);
+  // Listen for player_status_changed events via WebSocket
+  useEffect(() => {
+    if (!activeRoundId) return;
 
-    const playersRef = ref(database, groupPlayersPath);
-
-    const unsubscribe = onValue(playersRef, (snapshot) => {
-      if (!snapshot.exists()) {
-        console.log('[WaitingPlayers] No players data found');
-        return;
-      }
-
-      const data = snapshot.val();
-      console.log('[WaitingPlayers] Players data received:', data);
-
-      const playersList: PlayerStatus[] = [];
-      let connected = 0;
-
-      Object.keys(data).forEach((key) => {
-        if (key.startsWith('jugador_')) {
-          const player = data[key];
-          playersList.push({
-            nombre: player.nombre || '',
-            apellido: player.apellido || '',
-            deviceId: player.deviceId,
-          });
-          if (player.deviceId) {
-            connected++;
-          }
-        }
-      });
-
-      console.log('[WaitingPlayers] Connected players:', connected, '/', playersList.length);
-      setPlayersStatus(playersList);
-      setConnectedCount(connected);
-
-      setOfflinePlayers(prev => {
-        const newSet = new Set(prev);
-        playersList.forEach((_, idx) => {
-          if (playersList[idx].deviceId && newSet.has(idx)) {
-            newSet.delete(idx);
-          }
+    const unsubscribe = wsClient.on('player_status_changed', (payload) => {
+      setPlayersStatus((prev) => {
+        const connected = payload.status === 'ready' || payload.status === 'playing';
+        const updated = prev.map((p) => {
+          if (p.id !== payload.player_id) return p;
+          return { ...p, deviceId: connected ? payload.player_id : undefined };
         });
-        return newSet;
+        setConnectedCount(updated.filter((p) => p.deviceId).length);
+        return updated;
       });
     });
 
-    return () => {
-      console.log('[WaitingPlayers] Unsubscribing from Firebase listener');
-      unsubscribe();
-    };
-  }, [params.courseName, params.routeName, params.gameName, params.groupName]);
+    return unsubscribe;
+  }, [activeRoundId]);
 
   useEffect(() => {
     const effectiveConnected = playersStatus.filter((p, idx) => p.deviceId || offlinePlayers.has(idx)).length;
@@ -174,7 +152,7 @@ export default function WaitingPlayersScreen() {
                   styles.playerName,
                   (isConnected || isOffline) && styles.playerNameConnected
                 ]}>
-                  {player.nombre} {player.apellido}
+                  {player.firstName} {player.lastName}
                 </Text>
                 
                 {!isConnected && (

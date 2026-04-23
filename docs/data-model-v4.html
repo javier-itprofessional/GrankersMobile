@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grankers Mobile — Data Model v4</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 32px 24px 64px;
+      min-height: 100vh;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: #f8fafc;
+      margin-bottom: 4px;
+    }
+    .subtitle {
+      text-align: center;
+      font-size: 0.8rem;
+      color: #64748b;
+      margin-bottom: 40px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    /* ── SECTION HEADERS ── */
+    .section-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #475569;
+      margin: 40px 0 14px;
+      padding-left: 4px;
+      border-left: 3px solid #334155;
+      padding-left: 10px;
+    }
+
+    /* ── GRID LAYOUTS ── */
+    .grid { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+    @media (max-width: 900px) {
+      .grid-4 { grid-template-columns: repeat(2, 1fr); }
+      .grid-3 { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 600px) {
+      .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    /* ── TABLE CARD ── */
+    .table-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .table-card.new {
+      border-color: #22d3ee44;
+      box-shadow: 0 0 0 1px #22d3ee22, 0 4px 20px #22d3ee11;
+    }
+    .table-card.core {
+      border-color: #6366f144;
+      box-shadow: 0 0 0 1px #6366f122, 0 4px 20px #6366f111;
+    }
+    .table-card.support {
+      border-color: #a78bfa33;
+    }
+    .table-card.infra {
+      border-color: #475569;
+    }
+
+    .card-header {
+      padding: 10px 14px 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-header.bg-core    { background: #312e81; }
+    .card-header.bg-new     { background: #164e63; }
+    .card-header.bg-support { background: #2e1065; }
+    .card-header.bg-infra   { background: #1e293b; border-bottom: 1px solid #334155; }
+
+    .card-icon { font-size: 1rem; }
+    .card-title {
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #f1f5f9;
+    }
+    .card-badge {
+      margin-left: auto;
+      font-size: 0.6rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 2px 7px;
+      border-radius: 99px;
+    }
+    .badge-new     { background: #0e7490; color: #cffafe; }
+    .badge-core    { background: #4338ca; color: #e0e7ff; }
+    .badge-support { background: #6d28d9; color: #ede9fe; }
+    .badge-infra   { background: #374151; color: #9ca3af; }
+
+    .card-body { padding: 10px 14px 12px; }
+
+    /* ── FIELD ROW ── */
+    .field {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 3px 0;
+      border-bottom: 1px solid #1e293b;
+      font-size: 0.75rem;
+    }
+    .field:last-child { border-bottom: none; }
+
+    .field-tag {
+      font-size: 0.58rem;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      letter-spacing: 0.04em;
+    }
+    .tag-pk  { background: #78350f; color: #fde68a; }
+    .tag-fk  { background: #064e3b; color: #6ee7b7; }
+    .tag-ref { background: #1e3a5f; color: #93c5fd; }
+
+    .field-name {
+      font-family: 'Courier New', monospace;
+      color: #cbd5e1;
+      flex-shrink: 0;
+    }
+    .field-name.nullable { color: #94a3b8; }
+    .field-name.new-field { color: #67e8f9; font-weight: 700; }
+
+    .field-type {
+      color: #64748b;
+      font-size: 0.68rem;
+      margin-left: auto;
+      white-space: nowrap;
+    }
+
+    .field-note {
+      color: #475569;
+      font-size: 0.65rem;
+      font-style: italic;
+    }
+
+    .field-divider {
+      font-size: 0.6rem;
+      color: #334155;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 5px 0 2px;
+      border-bottom: none !important;
+    }
+
+    /* ── ENUM / TYPE CHIPS ── */
+    .enum-block {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .chip {
+      font-family: 'Courier New', monospace;
+      font-size: 0.62rem;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #94a3b8;
+    }
+    .chip.active { border-color: #6366f1; color: #a5b4fc; }
+
+    /* ── ACTION LOG SPECIAL ── */
+    .action-log-card {
+      background: #1e293b;
+      border: 1px solid #f59e0b44;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 0 0 1px #f59e0b11, 0 4px 24px #f59e0b0a;
+    }
+    .action-log-header {
+      background: #451a03;
+      padding: 10px 14px 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .action-log-body {
+      padding: 12px 14px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 600px) { .action-log-body { grid-template-columns: 1fr; } }
+
+    .action-types-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 4px;
+    }
+    .action-chip {
+      font-family: 'Courier New', monospace;
+      font-size: 0.63rem;
+      padding: 3px 8px;
+      border-radius: 5px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #94a3b8;
+      white-space: nowrap;
+    }
+    .action-chip.event    { border-color: #f59e0b55; color: #fcd34d; }
+    .action-chip.state    { border-color: #22d3ee55; color: #67e8f9; }
+    .action-chip.matchplay{ border-color: #a78bfa55; color: #c4b5fd; }
+    .action-chip.media    { border-color: #34d35955; color: #6ee7b7; }
+
+    /* ── FLOW DIAGRAM ── */
+    .flow-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 16px 20px;
+    }
+    .flow-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .flow-row:last-child { margin-bottom: 0; }
+    .flow-node {
+      background: #0f172a;
+      border: 1px solid #475569;
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 0.75rem;
+      font-family: 'Courier New', monospace;
+      color: #e2e8f0;
+      white-space: nowrap;
+    }
+    .flow-node.highlight { border-color: #6366f1; color: #a5b4fc; background: #1e1b4b; }
+    .flow-node.green     { border-color: #22d3ee; color: #67e8f9; background: #0a2a2a; }
+    .flow-node.amber     { border-color: #f59e0b; color: #fcd34d; background: #1c1100; }
+    .flow-arrow { color: #475569; font-size: 1rem; }
+    .flow-label { font-size: 0.65rem; color: #64748b; font-style: italic; }
+
+    /* ── LEGEND ── */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      justify-content: center;
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #1e293b;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.7rem;
+      color: #64748b;
+    }
+    .legend-dot {
+      width: 10px; height: 10px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Grankers Mobile</h1>
+  <div class="subtitle">WatermelonDB Local Schema — v4 &nbsp;·&nbsp; 2026-04-21</div>
+
+  <!-- ═══ CORE ═══ -->
+  <div class="section-title">Core — Rondas y Puntuaciones</div>
+  <div class="grid-3">
+
+    <!-- rounds -->
+    <div class="table-card core">
+      <div class="card-header bg-core">
+        <span class="card-icon">🏌️</span>
+        <span class="card-title">rounds</span>
+        <span class="card-badge badge-core">Core</span>
+      </div>
+      <div class="card-body">
+        <div class="field"><span class="field-tag tag-pk">PK</span><span class="field-name">id</span><span class="field-type">wdb</span></div>
+        <div class="field"><span class="field-name">mode</span><span class="field-type">text</span></div>
+        <div class="field"><span class="field-name">course_name</span><span class="field-type">text</span></div>
+        <div class="field"><span class="field-name">route_name</span><span class="field-type">text</span></div>
+        <div class="field"><span class="field-name">current_hole</span><span class="field-type">number</span></div>
+        <div class="field"><span class="field-name">status</span><span class="field-type">text</span></div>
+        <div class="field"><span class="field-name">scoring_mode</span><span class="field-type">text</span></div>
+        <div class="field"><span class="field-name nullable">visible_player_ids</span><span class="field-type">JSON[]</span></div>
+        <div class="field"><span class="field-name nullable">hole_pars</span><span class="field-type">JSON[]</span></div>
+        <div class="field"><span class="field-name nullable">hole_handicaps</span><span class="field-type">JSON[]</span></div>
+        <div class="field"><span class="field-name nullable">finished_at</span><span class="field-type">number?</span></div>
+        <div class="field"><span class="field-name">created_at</span><span class="field-type">number</span></div>
+        <div class="field field-divider">competition</div>
+        <div class="field"><span class="field-name nullable">codigo_grupo</span><span class="field-type">text?</span></div>
+        <div class="field"><span class="field-name nullable">nombre_competicion</span><span class="field-type">text?</span></div>
+        <div class="field"><span class="field-name nullable">nombre_prueba</span><span class="field-type">text?</span></div>
+        <div class="field"><span class="field-name nullable">fecha</span><span class="field-type">text?</span></div>
+        <div class="field"><span class="field-tag tag-fk">FK</span><span class="field-name new-field nullable">tour_event_id</span><span class="field-type">text?</span></div>
+        <div class="field field-divider">free-play</div>
+        <div class="field"><span class="field-name nullable">game_name</span><span class="field-type">text?</span></div>
+        <div class="field"><span class="field-name nullable">group_name</span><span class="field-type">text?</span></div>
+        <div class="field"><span class="field-name nullable">password</span><span class="field-type">text?</span></div>
+      </div>
+    </div>
+
+    <!-- round_players -->
+    <div class="table-card core">
+      <div class="card-header bg-core">
+        <span class="card-icon">👤</span>
+        <span class="card-title">round_players</span>
+        <span class="card-badge badge-core">Core</span>
+      </div>
+      <div class="card-body">
+        <div class="field"><span class="field-tag tag-pk">PK</span><span class="field-name">id</span><span class="field-type">wdb</span></div>
+        <div class="field"><span class="field-tag tag-fk">FK</span><span class="field-name">round_id</span><span class="field-type">→ rounds</span></div>
+        <div class="field"><span class="field-name">player_external_id</span><span class="field-type">text</span></div>
+        <div class="field"><span class="field-tag tag-fk">FK</span><span class="field-name new-field nullable">player_id</span><span class="field-type">→ players_cache</span></div>
+        <div class="field"><span class="field-name">nombre</span><span class="field-type">text</span></div>
+        <div class="field"><span class="field-name">apellido</span><span class="field-type">text</span></div>
+        <div class="field"><span class="field-name nullable">licencia</span><span class="field-type">text?</span></div>
+        <div class="field"><span class="field-name nullable">handicap</span><span class="field-type">number?</span></div>
+        <div class="field"><span class="field-name nullable">device_id</span><span class="field-type">text?</span></div>
+        <div class="field"><span class="field-name">is_local_device</span><span class="field-type">bool</span></div>
+        <div class="field"><span class="field-name">estado</span><span class="field-type">text</span></div>
+      </div>
+    </div>
+
+    <!-- hole_scores -->
+    <div class="table-card core">
+      <div class="card-header bg-core">
+        <span class="card-icon">⛳</span>
+        <span class="card-title">hole_scores</span>
+        <span class="card-badge badge-core">Core</span>
+      </div>
+      <div class="card-body">
+        <div class="field"><span class="field-tag tag-pk">PK</span><span class="field-name">id</span><span class="field-type">wdb</span></div>
+        <div class="field"><span class="field-tag tag-fk">FK</span><span class="field-name">round_id</span><span class="field-type">→ rounds</span></div>
+        <div class="field"><span class="field-name">player_external_id</span><span class="field-type">text</span></div>
+        <div class="field"><span class="field-name">hole_number</span><span class="field-type">number</span></div>
+        <div class="field"><span class="field-name">par</span><span class="field-type">number</span></div>
+        <div class="field"><span class="field-name">handicap</span><span class="field-type">number</span></div>
+        <div class="field"><span class="field-name">score</span><span class="field-type">number</span></div>
+        <div class="field"><span class="field-name new-field nullable">strokes_net</span><span class="field-type">number?</span></div>
+        <div class="field"><span class="field-name">saved</span><span class="field-type">bool</span></div>
+        <div class="field"><span class="field-name nullable">saved_at</span><span class="field-type">number?</span></div>
+        <div class="field"><span class="field-name nullable">conflict_score_local</span><span class="field-type">number?</span></div>
+        <div class="field"><span class="field-name nullable">conflict_score_marcador</span><span class="field-type">number?</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══ ACTION LOG ═══ -->
+  <div class="section-title">Event Sourcing — Action Log</div>
+  <div class="action-log-card">
+    <div class="action-log-header">
+      <span class="card-icon">📋</span>
+      <span class="card-title">action_log</span>
+      <span class="card-badge badge-support" style="margin-left:auto;">Event Store</span>
+    </div>
+    <div class="action-log-body">
+      <div>
+        <div class="field"><span class="field-tag tag-pk">PK</span><span class="field-name">id</span><span class="field-type">wdb</span></div>
+        <div class="field"><span class="field-name">round_id</span><span class="field-type">text</span></div>
+        <div class="field"><span class="field-name">player_external_id</span><span class="field-type">text</span></div>
+        <div class="field"><span class="field-name">action_type</span><span class="field-type">enum ↓</span></div>
+        <div class="field"><span class="field-name">payload</span><span class="field-type">JSON</span></div>
+        <div class="field"><span class="field-name">created_at</span><span class="field-type">number</span></div>
+        <div class="field"><span class="field-name nullable">synced_at</span><span class="field-type">number?</span></div>
+        <div class="field"><span class="field-name">sync_status</span><span class="field-type">enum</span></div>
+        <div class="field"><span class="field-name">retry_count</span><span class="field-type">number</span></div>
+        <div class="field"><span class="field-name nullable">last_error</span><span class="field-type">text?</span></div>
+        <div class="enum-block">
+          <span class="chip active">pending</span>
+          <span class="chip active">syncing</span>
+          <span class="chip active">synced</span>
+          <span class="chip active">failed</span>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:0.65rem;color:#64748b;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.08em;">action_type (13 tipos)</div>
+        <div class="action-types-grid">
+          <span class="action-chip event">HOLE_SAVED</span>
+          <span class="action-chip event">SCORE_AMENDED</span>
+          <span class="action-chip event">PENALTY_ADDED</span>
+          <span class="action-chip event">NOTE_ADDED</span>
+          <span class="action-chip state">PLAYER_READY</span>
+          <span class="action-chip state">ROUND_STARTED</span>
+          <span class="action-chip state">ROUND_FINISHED</span>
+          <span class="action-chip state">ROUND_SUSPENDED</span>
+          <span class="action-chip state">ROUND_RESUMED</span>
+          <span class="action-chip matchplay">CONCESSION</span>
+          <span class="action-chip matchplay">HOLE_WON</span>
+          <span class="action-chip matchplay">HOLE_HALVED</span>
+          <span class="action-chip media">MEDIA_ATTACHED</span>
+          <span class="action-chip media">SIGNATURE_ADDED</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ NEW TABLES ═══ -->
+  <div class="section-title">Nuevas Tablas — Schema v4</div>
+  <div class="grid-2">
+
+    <!-- tour_events -->
+    <div class="table-card new">
+      <div class="card-header bg-new">
+        <span class="card-icon">🏆</span>
+        <span class="card-title">tour_events</span>
+        <span class="card-badge badge-new">Nuevo</span>
+      </div>
+      <div class="card-body">
+        <div class="field"><span class="field-tag tag-pk">PK</span><span class="field-name">id</span><span class="field-type">wdb</span></div>
+        <div class="field"><span class="field-name">external_id</span><span class="field-type">text (idx)</span></div>
+        <div class="field"><span class="field-name">nombre_competicion</span><span class="field-type">text</span></div>
+        <div class="field"><span class="field-name">nombre_prueba</span><span class="field-type">text</span></div>
+        <div class="field"><span class="field-name">fecha</span><span class="field-type">text</span></div>
+        <div class="field"><span class="field-name nullable">hora_salida</span><span class="field-type">text?</span></div>
+        <div class="field"><span class="field-name nullable">formato</span><span class="field-type">enum?</span></div>
+        <div class="field"><span class="field-name">status</span><span class="field-type">enum</span></div>
+        <div class="field"><span class="field-name nullable">cut_rule</span><span class="field-type">JSON?</span></div>
+        <div class="field"><span class="field-name nullable">fee_tiers</span><span class="field-type">JSON?</span></div>
+        <div class="field"><span class="field-name nullable">tee_times</span><span class="field-type">JSON?</span></div>
+        <div class="field"><span class="field-name nullable">codigo_grupo</span><span class="field-type">text?</span></div>
+        <div class="field"><span class="field-name nullable">campo</span><span class="field-type">text?</span></div>
+        <div class="field"><span class="field-name nullable">recorrido</span><span class="field-type">text?</span></div>
+        <div class="field"><span class="field-name">synced_at</span><span class="field-type">number</span></div>
+        <div class="enum-block">
+          <span class="chip">upcoming</span><span class="chip">active</span><span class="chip">finished</span>
+          <span class="chip">stroke</span><span class="chip">stableford</span><span class="chip">matchplay</span>
+          <span class="chip">greensomes</span><span class="chip">fourball</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- media_attachments -->
+    <div class="table-card new">
+      <div class="card-header bg-new">
+        <span class="card-icon">📎</span>
+        <span class="card-title">media_attachments</span>
+        <span class="card-badge badge-new">Nuevo</span>
+      </div>
+      <div class="card-body">
+        <div class="field"><span class="field-tag tag-pk">PK</span><span class="field-name">id</span><span class="field-type">wdb</span></div>
+        <div class="field"><span class="field-name">round_id</span><span class="field-type">text</span></div>
+        <div class="field"><span class="field-name nullable">player_external_id</span><span class="field-type">text?</span></div>
+        <div class="field"><span class="field-name">attachment_type</span><span class="field-type">enum</span></div>
+        <div class="field"><span class="field-name">local_path</span><span class="field-type">text (file://)</span></div>
+        <div class="field"><span class="field-name nullable">remote_url</span><span class="field-type">text?</span></div>
+        <div class="field"><span class="field-name">upload_status</span><span class="field-type">enum</span></div>
+        <div class="field"><span class="field-tag tag-ref">ref</span><span class="field-name nullable">action_log_id</span><span class="field-type">text?</span></div>
+        <div class="field"><span class="field-name nullable">mime_type</span><span class="field-type">text?</span></div>
+        <div class="field"><span class="field-name nullable">file_size_bytes</span><span class="field-type">number?</span></div>
+        <div class="field"><span class="field-name">created_at</span><span class="field-type">number</span></div>
+        <div class="field"><span class="field-name nullable">synced_at</span><span class="field-type">number?</span></div>
+        <div class="field"><span class="field-name nullable">last_error</span><span class="field-type">text?</span></div>
+        <div class="enum-block">
+          <span class="chip">photo</span><span class="chip">signature</span><span class="chip">document</span>
+          <span class="chip">pending</span><span class="chip">uploading</span><span class="chip">synced</span><span class="chip">failed</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- players_cache -->
+    <div class="table-card new">
+      <div class="card-header bg-new">
+        <span class="card-icon">👥</span>
+        <span class="card-title">players_cache</span>
+        <span class="card-badge badge-new">Nuevo</span>
+      </div>
+      <div class="card-body">
+        <div class="field"><span class="field-tag tag-pk">PK</span><span class="field-name">id</span><span class="field-type">wdb</span></div>
+        <div class="field"><span class="field-name">external_id</span><span class="field-type">text (idx)</span></div>
+        <div class="field"><span class="field-name">nombre</span><span class="field-type">text</span></div>
+        <div class="field"><span class="field-name">apellido</span><span class="field-type">text</span></div>
+        <div class="field"><span class="field-name nullable">licencia</span><span class="field-type">text?</span></div>
+        <div class="field"><span class="field-name nullable">handicap_index</span><span class="field-type">number?</span></div>
+        <div class="field"><span class="field-name nullable">avatar_url</span><span class="field-type">text?</span></div>
+        <div class="field"><span class="field-name">synced_at</span><span class="field-type">number</span></div>
+        <div class="enum-block">
+          <span class="chip active">computed: fullName</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- leaderboard_cache + rankings_cache -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+
+      <div class="table-card new">
+        <div class="card-header bg-new">
+          <span class="card-icon">📊</span>
+          <span class="card-title">leaderboard_cache</span>
+          <span class="card-badge badge-new">Nuevo</span>
+        </div>
+        <div class="card-body">
+          <div class="field"><span class="field-tag tag-pk">PK</span><span class="field-name">id</span><span class="field-type">wdb</span></div>
+          <div class="field"><span class="field-name">round_id</span><span class="field-type">text (idx)</span></div>
+          <div class="field"><span class="field-name">payload</span><span class="field-type">JSON[]</span></div>
+          <div class="field"><span class="field-name">updated_at</span><span class="field-type">number</span></div>
+          <div class="field"><span class="field-name">source</span><span class="field-type">enum</span></div>
+          <div class="enum-block">
+            <span class="chip">websocket</span><span class="chip">local</span>
+            <span class="chip active">computed: entries</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-card new">
+        <div class="card-header bg-new">
+          <span class="card-icon">🥇</span>
+          <span class="card-title">rankings_cache</span>
+          <span class="card-badge badge-new">Nuevo</span>
+        </div>
+        <div class="card-body">
+          <div class="field"><span class="field-tag tag-pk">PK</span><span class="field-name">id</span><span class="field-type">wdb</span></div>
+          <div class="field"><span class="field-name">player_external_id</span><span class="field-type">text (idx)</span></div>
+          <div class="field"><span class="field-tag tag-ref">ref</span><span class="field-name">tour_event_id</span><span class="field-type">→ tour_events</span></div>
+          <div class="field"><span class="field-name">handicap_index</span><span class="field-type">number</span></div>
+          <div class="field"><span class="field-name nullable">ranking_position</span><span class="field-type">number?</span></div>
+          <div class="field"><span class="field-name nullable">category</span><span class="field-type">text?</span></div>
+          <div class="field"><span class="field-name">synced_at</span><span class="field-type">number</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══ COURSE DATA ═══ -->
+  <div class="section-title">Catálogo de Campos</div>
+  <div class="grid-3">
+
+    <div class="table-card support">
+      <div class="card-header bg-support">
+        <span class="card-icon">🗺️</span>
+        <span class="card-title">courses</span>
+        <span class="card-badge badge-support">Catálogo</span>
+      </div>
+      <div class="card-body">
+        <div class="field"><span class="field-tag tag-pk">PK</span><span class="field-name">id</span><span class="field-type">wdb</span></div>
+        <div class="field"><span class="field-name">external_id</span><span class="field-type">text</span></div>
+        <div class="field"><span class="field-name">name</span><span class="field-type">text</span></div>
+        <div class="field"><span class="field-name">synced_at</span><span class="field-type">number</span></div>
+      </div>
+    </div>
+
+    <div class="table-card support">
+      <div class="card-header bg-support">
+        <span class="card-icon">🛤️</span>
+        <span class="card-title">routes</span>
+        <span class="card-badge badge-support">Catálogo</span>
+      </div>
+      <div class="card-body">
+        <div class="field"><span class="field-tag tag-pk">PK</span><span class="field-name">id</span><span class="field-type">wdb</span></div>
+        <div class="field"><span class="field-tag tag-fk">FK</span><span class="field-name">course_id</span><span class="field-type">→ courses</span></div>
+        <div class="field"><span class="field-name">external_id</span><span class="field-type">text</span></div>
+        <div class="field"><span class="field-name">name</span><span class="field-type">text</span></div>
+        <div class="field"><span class="field-name">synced_at</span><span class="field-type">number</span></div>
+      </div>
+    </div>
+
+    <div class="table-card support">
+      <div class="card-header bg-support">
+        <span class="card-icon">🕳️</span>
+        <span class="card-title">holes</span>
+        <span class="card-badge badge-support">Catálogo</span>
+      </div>
+      <div class="card-body">
+        <div class="field"><span class="field-tag tag-pk">PK</span><span class="field-name">id</span><span class="field-type">wdb</span></div>
+        <div class="field"><span class="field-tag tag-fk">FK</span><span class="field-name">route_id</span><span class="field-type">→ routes</span></div>
+        <div class="field"><span class="field-name">hole_number</span><span class="field-type">number</span></div>
+        <div class="field"><span class="field-name">par</span><span class="field-type">number</span></div>
+        <div class="field"><span class="field-name">handicap</span><span class="field-type">number</span></div>
+        <div class="field"><span class="field-name nullable">distance_meters</span><span class="field-type">number?</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══ INFRA ═══ -->
+  <div class="section-title">Infraestructura</div>
+  <div class="grid-2">
+
+    <div class="table-card infra">
+      <div class="card-header bg-infra">
+        <span class="card-icon">⚙️</span>
+        <span class="card-title">app_config</span>
+        <span class="card-badge badge-infra">Infra</span>
+      </div>
+      <div class="card-body">
+        <div class="field"><span class="field-tag tag-pk">PK</span><span class="field-name">id</span><span class="field-type">wdb</span></div>
+        <div class="field"><span class="field-name">key</span><span class="field-type">text (unique)</span></div>
+        <div class="field"><span class="field-name">value</span><span class="field-type">text</span></div>
+        <div class="field"><span class="field-name">updated_at</span><span class="field-type">number</span></div>
+        <div class="enum-block">
+          <span class="chip">fcm_token</span>
+          <span class="chip">user_id</span>
+          <span class="chip">last_sync</span>
+          <span class="chip">...</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-card infra">
+      <div class="card-header bg-infra">
+        <span class="card-icon">🔄</span>
+        <span class="card-title">pending_sync</span>
+        <span class="card-badge badge-infra">Legacy</span>
+      </div>
+      <div class="card-body">
+        <div class="field" style="color:#475569;font-size:0.72rem;padding:6px 0;">
+          En revisión — la lógica de sincronización ha migrado a <code style="background:#0f172a;padding:1px 4px;border-radius:3px;color:#94a3b8">action_log</code>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══ SYNC FLOW ═══ -->
+  <div class="section-title">Flujo de Sincronización</div>
+  <div class="flow-card">
+
+    <div class="flow-row">
+      <span class="flow-node">User Action</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node highlight">action_log</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node highlight">SyncEngine</span>
+      <span class="flow-label">(batch, retry, exponential backoff)</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node green">POST /api/v1/sync/</span>
+    </div>
+
+    <div class="flow-row">
+      <span class="flow-node">Photo / Doc / Firma</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node amber">media_attachments</span>
+      <span class="flow-label">(pipeline independiente)</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node green">CDN / S3 Upload</span>
+    </div>
+
+    <div class="flow-row">
+      <span class="flow-node">WebSocket</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node green">leaderboard_cache</span>
+      <span class="flow-arrow">/</span>
+      <span class="flow-node green">round_players.estado</span>
+    </div>
+
+    <div class="flow-row">
+      <span class="flow-node">Backend sync</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node amber">tour_events</span>
+      <span class="flow-arrow">/</span>
+      <span class="flow-node amber">players_cache</span>
+      <span class="flow-arrow">/</span>
+      <span class="flow-node amber">rankings_cache</span>
+    </div>
+
+  </div>
+
+  <!-- ═══ LEGEND ═══ -->
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#4338ca"></div> Core (rondas y puntuaciones)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#0e7490"></div> Nuevo en v4</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#6d28d9"></div> Catálogo de campos</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#374151"></div> Infraestructura</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#78350f"></div> PK — Primary Key</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#064e3b"></div> FK — Foreign Key</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#1e3a5f"></div> ref — Referencia suelta</div>
+    <div class="legend-item" style="color:#67e8f9">✦ Campo nuevo en v4</div>
+  </div>
+
+</body>
+</html>

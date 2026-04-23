@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import * as Application from 'expo-application';
 import Colors from '../../constants/colors';
 import { useCompetition } from '../../providers/CompetitionProvider';
-import { linkDeviceToCompetitionPlayer, subscribeToCompetitionPlayers } from '@/config/firebase';
+import { linkDeviceToCompetitionPlayer, subscribeToCompetitionPlayers } from '@/services/game-service';
 
 export default function CompetitionSelectPlayerScreen() {
   const router = useRouter();
@@ -18,12 +18,12 @@ export default function CompetitionSelectPlayerScreen() {
   const autoSelectRef = useRef<string | null>(null);
   const [isAutoAssigning, setIsAutoAssigning] = useState<boolean>(false);
 
-  const competitionData = useMemo(() => 
+  const competitionData = useMemo(() =>
     params.competitionData ? JSON.parse(params.competitionData) : competition,
     [params.competitionData, competition]
   );
-  const players = useMemo(() => competitionData?.jugadores || [], [competitionData]);
-  const codigoGrupo = competitionData?.codigo_grupo || '';
+  const players = useMemo(() => competitionData?.players || [], [competitionData]);
+  const groupCode = competitionData?.group_code || '';
 
   const handleSelectPlayer = useCallback(async (playerId: string, providedDeviceId?: string) => {
     const effectiveDeviceId = providedDeviceId || deviceId;
@@ -37,7 +37,7 @@ export default function CompetitionSelectPlayerScreen() {
       return;
     }
 
-    if (!codigoGrupo) {
+    if (!groupCode) {
       Alert.alert('Error', 'Faltan datos necesarios para vincular el dispositivo');
       return;
     }
@@ -48,7 +48,7 @@ export default function CompetitionSelectPlayerScreen() {
     setIsLinking(true);
     
     try {
-      await linkDeviceToCompetitionPlayer(codigoGrupo, playerId, effectiveDeviceId);
+      await linkDeviceToCompetitionPlayer(groupCode, playerId, effectiveDeviceId);
       
       console.log('[CompetitionSelectPlayer] ✅ Device linked successfully to player');
       
@@ -85,7 +85,7 @@ export default function CompetitionSelectPlayerScreen() {
     } finally {
       setIsLinking(false);
     }
-  }, [deviceId, codigoGrupo, competitionData, setDevicePlayerId, router]);
+  }, [deviceId, groupCode, competitionData, setDevicePlayerId, router]);
 
   useEffect(() => {
     if (autoSelectRef.current && deviceId) {
@@ -135,31 +135,26 @@ export default function CompetitionSelectPlayerScreen() {
   }, []);
 
   useEffect(() => {
-    if (!codigoGrupo) {
+    if (!groupCode) {
       console.log('[CompetitionSelectPlayer] Missing competition code');
-      setUnassignedPlayers(players);
+      setUnassignedPlayers(
+        players.map((p: { id: string; first_name: string; last_name: string; handicap?: number }) => ({
+          id: p.id, firstName: p.first_name, lastName: p.last_name, handicap: p.handicap,
+        }))
+      );
       setIsLoading(false);
       return;
     }
 
-    console.log('[CompetitionSelectPlayer] Subscribing to real-time player updates for code:', codigoGrupo);
+    console.log('[CompetitionSelectPlayer] Subscribing to real-time player updates for code:', groupCode);
 
-    const unsubscribe = subscribeToCompetitionPlayers(codigoGrupo, (data) => {
-      console.log('[CompetitionSelectPlayer] Real-time update received:', data);
+    const knownPlayers = players.map((p: { id: string; first_name: string; last_name: string }) => ({
+      id: p.id, firstName: p.first_name, lastName: p.last_name,
+    }));
+    const unsubscribe = subscribeToCompetitionPlayers(groupCode, knownPlayers, (statusList) => {
+      console.log('[CompetitionSelectPlayer] Real-time update received:', statusList);
 
-      const unassigned: any[] = [];
-
-      players.forEach((player: any) => {
-        const fbPlayer = data[player.id];
-        const hasDevice = fbPlayer?.deviceId;
-        const isOffline = fbPlayer?.estado === 'offline';
-        if (!hasDevice && !isOffline) {
-          unassigned.push(player);
-          console.log(`[CompetitionSelectPlayer] Player ${player.id} is unassigned and online`);
-        } else {
-          console.log(`[CompetitionSelectPlayer] Player ${player.id} excluded (deviceId: ${hasDevice}, offline: ${isOffline})`);
-        }
-      });
+      const unassigned = statusList.filter((p) => !p.deviceId && p.status !== 'offline');
 
       console.log('[CompetitionSelectPlayer] Unassigned players:', unassigned.length);
       setUnassignedPlayers(unassigned);
@@ -188,7 +183,7 @@ export default function CompetitionSelectPlayerScreen() {
       console.log('[CompetitionSelectPlayer] Unsubscribing from real-time listener');
       unsubscribe();
     };
-  }, [codigoGrupo, players, router, deviceId, isLinking, handleSelectPlayer]);
+  }, [groupCode, players, router, deviceId, isLinking, handleSelectPlayer]);
 
   return (
     <View style={styles.container}>
@@ -223,7 +218,7 @@ export default function CompetitionSelectPlayerScreen() {
           </View>
 
           <View style={styles.playersContainer}>
-            {unassignedPlayers.map((player: { id: string; nombre: string; apellido: string; handicap?: number }) => (
+            {unassignedPlayers.map((player: { id: string; firstName: string; lastName: string; handicap?: number }) => (
               <TouchableOpacity
                 key={player.id}
                 style={[styles.playerButton, isLinking && styles.playerButtonDisabled]}
@@ -233,7 +228,7 @@ export default function CompetitionSelectPlayerScreen() {
               >
                 <View style={styles.playerInfo}>
                   <Text style={styles.playerName}>
-                    {player.nombre} {player.apellido}
+                    {player.firstName} {player.lastName}
                   </Text>
                   {player.handicap !== undefined && (
                     <Text style={styles.playerHandicap}>

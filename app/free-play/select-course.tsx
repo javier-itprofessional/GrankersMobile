@@ -4,8 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
 import { MapPin, ChevronDown, ArrowRight, Search, Users, X } from 'lucide-react-native';
 import Colors from '../../constants/colors';
-import { database } from '../../config/firebase';
-import { ref, get } from 'firebase/database';
+import { listCourses } from '@/services/course-service';
+import { listFreePlayGames } from '@/services/game-service';
 
 export default function SelectCourseScreen() {
   const router = useRouter();
@@ -38,20 +38,8 @@ export default function SelectCourseScreen() {
   const loadCourses = async () => {
     try {
       setLoading(true);
-      console.log('Loading courses from Firebase...');
-      
-      const recorridosRef = ref(database, 'recorridos');
-      const snapshot = await get(recorridosRef);
-      
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const courseNames = Object.keys(data);
-        console.log('Courses loaded:', courseNames);
-        setCourses(courseNames);
-      } else {
-        console.log('No courses found in database');
-        setCourses([]);
-      }
+      const data = await listCourses();
+      setCourses(data.map((c) => c.name));
     } catch (error) {
       console.error('Error loading courses:', error);
       Alert.alert('Error', 'No se pudieron cargar los campos de golf');
@@ -63,20 +51,9 @@ export default function SelectCourseScreen() {
   const loadRoutes = async (courseName: string) => {
     try {
       setLoadingRoutes(true);
-      console.log('Loading routes for course:', courseName);
-      
-      const routesRef = ref(database, `recorridos/${courseName}`);
-      const snapshot = await get(routesRef);
-      
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const routeNames = Object.keys(data);
-        console.log('Routes loaded:', routeNames);
-        setRoutes(routeNames);
-      } else {
-        console.log('No routes found for course:', courseName);
-        setRoutes([]);
-      }
+      const data = await listCourses();
+      const course = data.find((c) => c.name === courseName);
+      setRoutes(course ? course.routes.map((r) => r.name) : []);
     } catch (error) {
       console.error('Error loading routes:', error);
       Alert.alert('Error', 'No se pudieron cargar los recorridos');
@@ -104,25 +81,13 @@ export default function SelectCourseScreen() {
   const checkActiveGames = async () => {
     try {
       setCheckingGames(true);
-      console.log('Checking active games for course:', selectedCourse, 'route:', selectedRoute);
-      
-      const pachangasRef = ref(database, `pachangas_activas/${selectedCourse}/${selectedRoute}`);
-      const snapshot = await get(pachangasRef);
-      
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const gameNames = Object.keys(data);
-        console.log('Found active games:', gameNames);
-        
-        if (gameNames.length > 0) {
-          setActiveGames(gameNames);
-          setShowActiveGamesModal(true);
-          return;
-        }
+      const games = await listFreePlayGames(selectedCourse, selectedRoute);
+      if (games.length > 0) {
+        setActiveGames(games.map((g) => g.gameName));
+        setShowActiveGamesModal(true);
+      } else {
+        proceedToCreateGame();
       }
-      
-      console.log('No active games found, proceeding to create game');
-      proceedToCreateGame();
     } catch (error) {
       console.error('Error checking active games:', error);
       proceedToCreateGame();
@@ -145,27 +110,9 @@ export default function SelectCourseScreen() {
   const loadGroups = async (gameName: string) => {
     try {
       setLoadingGroups(true);
-      console.log('Loading groups for game:', gameName);
-      
-      const groupsRef = ref(database, `pachangas_activas/${selectedCourse}/${selectedRoute}/${gameName}`);
-      const snapshot = await get(groupsRef);
-      
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const allKeys = Object.keys(data);
-        const groupNames = allKeys.filter(key => 
-          key !== 'created_at' && 
-          key !== 'courseName' && 
-          key !== 'routeName' && 
-          key !== 'password' &&
-          key !== 'public'
-        );
-        console.log('Groups loaded:', groupNames);
-        setGroups(groupNames);
-      } else {
-        console.log('No groups found for game:', gameName);
-        setGroups([]);
-      }
+      const games = await listFreePlayGames(selectedCourse, selectedRoute);
+      const game = games.find((g) => g.gameName === gameName);
+      setGroups(game?.groups ?? []);
     } catch (error) {
       console.error('Error loading groups:', error);
       Alert.alert('Error', 'No se pudieron cargar los grupos');
@@ -185,23 +132,14 @@ export default function SelectCourseScreen() {
   const handleSelectGroup = async (groupName: string) => {
     console.log('Selected existing group:', groupName);
     setShowGroupsModal(false);
-    
+
     try {
-      const playersRef = ref(database, `pachangas_activas/${selectedCourse}/${selectedRoute}/${selectedGame}/${groupName}/jugadores`);
-      const snapshot = await get(playersRef);
-      
-      if (snapshot.exists()) {
-        const playersData = snapshot.val();
-        const playersArray = Object.entries(playersData).map(([key, value]: [string, any]) => ({
-          id: key,
-          nombre: value.nombre || '',
-          apellido: value.apellido || '',
-          handicap: value.handicap || '0',
-          licencia: value.licencia,
-        }));
-        
-        console.log('Found players in group:', playersArray);
-        
+      const { getActiveGamePlayers } = await import('@/services/game-service');
+      const gamePlayers = await getActiveGamePlayers(selectedCourse, selectedRoute, selectedGame, groupName);
+
+      if (gamePlayers) {
+        const playersArray = gamePlayers;
+
         router.push({
           pathname: '/free-play/select-device-player',
           params: {

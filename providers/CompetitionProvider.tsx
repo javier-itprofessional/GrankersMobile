@@ -1,443 +1,441 @@
 import createContextHook from '@nkzw/create-context-hook';
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import { Q } from '@nozbe/watermelondb';
 import type { Competition, PlayerScores, HoleScore } from '../types/game';
 import {
-  saveGameDataLocally,
-  loadGameDataLocally,
-  clearLocalGameData,
-  addPendingSync,
-  getPendingSync,
-  removePendingSync,
   subscribeToConnectionChanges,
   generateDeviceId,
+  getAppConfig,
+  setAppConfig,
+  removeAppConfig,
 } from '@/lib/offline-sync';
-import { syncCompetitionResults, saveHoleScoreToFirebase, subscribeToCompetitionScores, fetchCourseHoleHandicaps } from '@/config/firebase';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getCourseRouteData } from '@/services/course-service';
+import { syncEngine } from '@/services/sync-engine';
+import { wsClient } from '@/services/websocket';
+import type { LeaderboardEntry } from '@/services/websocket';
+import { database, Round, RoundPlayer, HoleScore as HoleScoreModel } from '@/database';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const generateHolePars = (): number[] => {
   const pars: number[] = [];
   let totalPar = 0;
-  
   for (let i = 0; i < 18; i++) {
     let par: number;
     const remaining = 18 - i;
     const maxAvg = Math.floor((72 - totalPar) / remaining);
     const minAvg = Math.ceil((72 - totalPar) / remaining);
-    
-    if (maxAvg >= 5) {
-      par = Math.random() > 0.5 ? 5 : 4;
-    } else if (minAvg <= 3) {
-      par = Math.random() > 0.5 ? 3 : 4;
-    } else {
-      par = 4;
-    }
-    
+    if (maxAvg >= 5) par = Math.random() > 0.5 ? 5 : 4;
+    else if (minAvg <= 3) par = Math.random() > 0.5 ? 3 : 4;
+    else par = 4;
     par = Math.max(3, Math.min(5, par));
-    
-    if (totalPar + par + (remaining - 1) * 3 > 72) {
-      par = 3;
-    }
-    if (totalPar + par + (remaining - 1) * 5 < 72) {
-      par = 5;
-    }
-    
+    if (totalPar + par + (remaining - 1) * 3 > 72) par = 3;
+    if (totalPar + par + (remaining - 1) * 5 < 72) par = 5;
     pars.push(par);
     totalPar += par;
   }
-  
   const diff = 72 - totalPar;
   if (diff !== 0) {
     for (let i = 0; i < Math.abs(diff); i++) {
       const idx = Math.floor(Math.random() * 18);
-      if (diff > 0 && pars[idx] < 5) {
-        pars[idx]++;
-      } else if (diff < 0 && pars[idx] > 3) {
-        pars[idx]--;
-      }
+      if (diff > 0 && pars[idx] < 5) pars[idx]++;
+      else if (diff < 0 && pars[idx] > 3) pars[idx]--;
     }
   }
-  
   return pars;
 };
 
+// ─── Provider ─────────────────────────────────────────────────────────────────
+
 export const [CompetitionProvider, useCompetition] = createContextHook(() => {
   const [competition, setCompetition] = useState<Competition | null>(null);
-  const [currentHole, setCurrentHole] = useState<number>(1);
+  const [currentHole, setCurrentHole] = useState(1);
   const [holePars, setHolePars] = useState<number[]>(generateHolePars());
+  const [holeHandicaps, setHoleHandicaps] = useState<number[]>(new Array(18).fill(0));
   const [playerScoresMap, setPlayerScoresMap] = useState<Map<string, PlayerScores>>(new Map());
-  const [isOnline, setIsOnline] = useState<boolean>(true);
-  const [isLoaded, setIsLoaded] = useState<boolean>(false);
+  const [isOnline, setIsOnline] = useState(true);
+  const [isLoaded, setIsLoaded] = useState(false);
   const [currentDevicePlayerId, setCurrentDevicePlayerId] = useState<string | null>(null);
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [currentScreen, setCurrentScreen] = useState<string | undefined>(undefined);
   const [scoringMode, setScoringMode] = useState<'all' | 'partial'>('all');
   const [visiblePlayerIds, setVisiblePlayerIds] = useState<string[]>([]);
-  const [holeHandicaps, setHoleHandicaps] = useState<number[]>(new Array(18).fill(0));
+  const [activeRoundId, setActiveRoundId] = useState<string | null>(null);
+  const [wsLeaderboard, setWsLeaderboard] = useState<LeaderboardEntry[] | null>(null);
 
-  const syncPendingData = useCallback(async () => {
-    console.log('[Competition] Syncing pending data...');
-    const pending = await getPendingSync();
-    
-    for (const item of pending) {
-      try {
-        if (item.type === 'competition_result') {
-          await syncCompetitionResults(item.data.codigoGrupo, item.data.scores);
-          await removePendingSync(item.id);
-          console.log('[Competition] Synced item:', item.id);
-        } else if (item.type === 'hole_score') {
-          await saveHoleScoreToFirebase(
-            item.data.codigoGrupo,
-            item.data.playerId,
-            item.data.holeNumber,
-            item.data.score,
-            { isOwnScore: item.data.isOwnScore, markerLicencia: item.data.markerLicencia }
-          );
-          await removePendingSync(item.id);
-          console.log('[Competition] Synced hole score:', item.id);
-        }
-      } catch (error) {
-        console.error('[Competition] Error syncing item:', item.id, error);
-      }
-    }
-  }, []);
+  // ─── Initial load ───────────────────────────────────────────────────────────
 
   useEffect(() => {
-    const loadSavedData = async () => {
+    const load = async () => {
       const generatedDeviceId = await generateDeviceId();
       setDeviceId(generatedDeviceId);
-      console.log('[Competition] Device ID initialized:', generatedDeviceId);
-      
-      const savedData = await loadGameDataLocally();
-      if (savedData && savedData.isCompetition) {
-        console.log('[Competition] Loading saved competition data...');
-        setCompetition(savedData.competition);
-        setPlayerScoresMap(savedData.playerScoresMap);
-        setCurrentHole(savedData.currentHole);
-        setHolePars(savedData.holePars);
-        setCurrentScreen(savedData.currentScreen);
 
-        if (savedData.competition?.campo && savedData.competition?.recorrido) {
-          console.log('[Competition] Re-fetching hole handicaps on restore:', savedData.competition.campo, savedData.competition.recorrido);
-          fetchCourseHoleHandicaps(savedData.competition.campo, savedData.competition.recorrido).then((hcps) => {
-            console.log('[Competition] Hole handicaps restored:', hcps);
-            setHoleHandicaps(hcps);
-          }).catch((err) => console.error('[Competition] Error restoring handicaps:', err));
+      const activeRounds = await database
+        .get<Round>('rounds')
+        .query(Q.and(Q.where('mode', 'competition'), Q.where('status', Q.notEq('finished'))))
+        .fetch();
+
+      if (activeRounds.length > 0) {
+        const round = activeRounds[0];
+        setActiveRoundId(round.id);
+
+        const players = await database
+          .get<RoundPlayer>('round_players')
+          .query(Q.where('round_id', round.id))
+          .fetch();
+
+        const comp: Competition = {
+          groupCode: round.groupCode ?? '',
+          competitionName: round.competitionName ?? '',
+          eventName: round.eventName ?? '',
+          courseName: round.courseName,
+          routeName: round.routeName,
+          date: round.date ?? undefined,
+          players: players.map((p) => ({
+            id: p.playerExternalId,
+            firstName: p.firstName,
+            lastName: p.lastName,
+            license: p.license ?? undefined,
+            handicap: p.handicap ?? undefined,
+          })),
+        };
+        setCompetition(comp);
+        setCurrentHole(round.currentHole);
+        setHolePars(round.holeParsArray);
+        setHoleHandicaps(round.holeHandicapsArray);
+        setCurrentScreen(round.currentScreen ?? undefined);
+        setScoringMode((round.scoringMode as 'all' | 'partial') ?? 'all');
+        setVisiblePlayerIds(round.visiblePlayerIdsArray);
+
+        const holeScores = await database
+          .get<HoleScoreModel>('hole_scores')
+          .query(Q.where('round_id', round.id))
+          .fetch();
+
+        const scoresMap = new Map<string, PlayerScores>();
+        for (const player of comp.players) {
+          const playerHoles = holeScores
+            .filter((h) => h.playerExternalId === player.id)
+            .sort((a, b) => a.holeNumber - b.holeNumber);
+          const scores: HoleScore[] = playerHoles.map((h) => ({
+            holeNumber: h.holeNumber, par: h.par, score: h.score, saved: h.saved,
+          }));
+          const saved = scores.filter((s) => s.saved);
+          scoresMap.set(player.id, {
+            playerId: player.id, scores,
+            totalScore: saved.reduce((sum, s) => sum + s.score, 0),
+            totalPar: saved.reduce((sum, s) => sum + s.par, 0),
+          });
         }
+        setPlayerScoresMap(scoresMap);
+
+        wsClient.connect(round.id);
       }
-      
-      const devicePlayerId = await AsyncStorage.getItem('currentDevicePlayerId');
-      if (devicePlayerId) {
-        console.log('[Competition] Loading device player ID:', devicePlayerId);
-        setCurrentDevicePlayerId(devicePlayerId);
-      }
-      
+
+      const savedDevicePlayerId = await getAppConfig('currentDevicePlayerId');
+      if (savedDevicePlayerId) setCurrentDevicePlayerId(savedDevicePlayerId);
+
       setIsLoaded(true);
     };
 
-    loadSavedData();
+    load();
+    syncEngine.start();
 
     const unsubscribe = subscribeToConnectionChanges((connected) => {
-      console.log('[Competition] Connection status changed:', connected);
       setIsOnline(connected);
-      if (connected) {
-        syncPendingData();
-      }
+      if (connected) syncEngine.flush();
     });
 
-    return unsubscribe;
-  }, [syncPendingData]);
+    return () => {
+      unsubscribe();
+      syncEngine.stop();
+      wsClient.disconnect();
+    };
+  }, []);
+
+  // ─── WebSocket: real-time leaderboard ───────────────────────────────────────
 
   useEffect(() => {
-    if (isLoaded && competition) {
-      saveGameDataLocally({
-        competition,
-        playerScoresMap,
-        currentHole,
-        holePars,
-        isCompetition: true,
-        currentScreen,
-      }).catch((error) => {
-        console.error('[Competition] Error saving game data:', error);
-      });
-    }
-  }, [competition, playerScoresMap, currentHole, holePars, currentScreen, isLoaded]);
+    if (!activeRoundId) return;
 
-  const startCompetition = useCallback((comp: Competition) => {
-    console.log('[Competition] Starting competition:', JSON.stringify(comp));
-    console.log('[Competition] Player IDs:', comp.jugadores.map(p => p.id));
-    console.log('[Competition] campo:', JSON.stringify(comp.campo), 'recorrido:', JSON.stringify(comp.recorrido));
-    setCompetition(comp);
-    setCurrentHole(1);
-    const pars = generateHolePars();
-    setHolePars(pars);
-
-    const campoVal = (comp.campo || '').trim();
-    const recorridoVal = (comp.recorrido || '').trim();
-    console.log('[Competition] campoVal:', JSON.stringify(campoVal), 'recorridoVal:', JSON.stringify(recorridoVal));
-
-    if (campoVal && recorridoVal) {
-      console.log('[Competition] Fetching hole handicaps for:', campoVal, recorridoVal);
-      fetchCourseHoleHandicaps(campoVal, recorridoVal).then((hcps) => {
-        console.log('[Competition] Hole handicaps loaded:', JSON.stringify(hcps));
-        setHoleHandicaps(hcps);
-      }).catch((err) => console.error('[Competition] Error fetching handicaps:', err));
-    } else {
-      console.log('[Competition] WARNING: No campo/recorrido available, handicaps will be 0');
-    }
-
-    const scoresMap = new Map<string, PlayerScores>();
-    comp.jugadores.forEach((player) => {
-      console.log(`[Competition] Creating score map for player: ${player.id}`);
-      const scores: HoleScore[] = [];
-      for (let i = 1; i <= 18; i++) {
-        scores.push({
-          holeNumber: i,
-          par: pars[i - 1],
-          score: pars[i - 1],
-          saved: false,
-        });
+    const unsub = wsClient.on('leaderboard_updated', (payload) => {
+      if (payload.round_id === activeRoundId) {
+        setWsLeaderboard(payload.leaderboard);
       }
-      scoresMap.set(player.id, {
-        playerId: player.id,
-        scores,
-        totalScore: 0,
-        totalPar: 72,
+    });
+
+    return unsub;
+  }, [activeRoundId]);
+
+  // ─── Persist currentHole and currentScreen ──────────────────────────────────
+
+  useEffect(() => {
+    if (!activeRoundId || !isLoaded) return;
+    database.write(async () => {
+      const round = await database.get<Round>('rounds').find(activeRoundId);
+      await round.update((r) => {
+        r.currentHole = currentHole;
+        r.currentScreen = currentScreen ?? null;
       });
     });
-    console.log('[Competition] Score map player IDs:', Array.from(scoresMap.keys()));
-    setPlayerScoresMap(scoresMap);
-  }, []);
+  }, [currentHole, currentScreen, activeRoundId, isLoaded]);
 
-  const updateScore = useCallback((playerId: string, holeNumber: number, newScore: number) => {
-    console.log('[Competition] Updating score:', { playerId, holeNumber, newScore });
-    setPlayerScoresMap((prev) => {
-      const newMap = new Map(prev);
-      const playerScores = newMap.get(playerId);
-      if (playerScores) {
-        const updatedScores = playerScores.scores.map((score) =>
-          score.holeNumber === holeNumber ? { ...score, score: newScore } : score
-        );
-        newMap.set(playerId, {
-          ...playerScores,
-          scores: updatedScores,
-        });
+  // ─── Actions ────────────────────────────────────────────────────────────────
+
+  const startCompetition = useCallback(async (comp: Competition) => {
+    let pars = generateHolePars();
+    let hcps = new Array(18).fill(0);
+    if (comp.courseName?.trim() && comp.routeName?.trim()) {
+      const courseData = await getCourseRouteData(comp.courseName.trim(), comp.routeName.trim()).catch(() => null);
+      if (courseData) {
+        pars = courseData.holes.map((h) => h.par);
+        hcps = courseData.holes.map((h) => h.handicap);
       }
-      return newMap;
-    });
-  }, []);
-
-  const saveHole = useCallback(async (holeNumber: number): Promise<{ hasConflict: boolean; playerId?: string; existingScore?: number; newScore?: number; playerName?: string } | void> => {
-    console.log('[Competition] === SAVING HOLE ===');
-    console.log('[Competition] Hole number:', holeNumber);
-    console.log('[Competition] Current device player ID:', currentDevicePlayerId);
-    
-    const playersToSync: { playerId: string; score: number; isOwnScore: boolean; markerLicencia?: string }[] = [];
-    
-    if (!competition) {
-      console.error('[Competition] No competition found');
-      return;
     }
 
-    const currentDevicePlayer = competition.jugadores.find(p => p.id === currentDevicePlayerId);
-    const currentDeviceLicencia = currentDevicePlayer?.licencia || '';
-    console.log('[Competition] Current device player licencia:', currentDeviceLicencia);
+    let roundId = '';
+    await database.write(async () => {
+      const old = await database
+        .get<Round>('rounds')
+        .query(Q.and(Q.where('mode', 'competition'), Q.where('status', Q.notEq('finished'))))
+        .fetch();
+      for (const r of old) await r.destroyPermanently();
 
-    const myIndex = competition.jugadores.findIndex(p => p.id === currentDevicePlayerId);
-    const marcandoIndex = myIndex !== -1 ? (myIndex + 1) % competition.jugadores.length : -1;
-    const marcandoId = marcandoIndex !== -1 ? competition.jugadores[marcandoIndex].id : null;
-    console.log('[Competition] Marcando player ID:', marcandoId);
-
-    competition.jugadores.forEach((player) => {
-      const isVisible = scoringMode === 'all' || visiblePlayerIds.includes(player.id);
-      if (!isVisible) return;
-
-      console.log(`[Competition] Processing player - ID: ${player.id}, Name: ${player.nombre}`);
-      const playerScores = playerScoresMap.get(player.id);
-      
-      if (!playerScores) {
-        console.error(`[Competition] No scores found for player ${player.id}`);
-        return;
-      }
-      
-      const holeScore = playerScores.scores.find((s) => s.holeNumber === holeNumber);
-      if (holeScore) {
-        const isOwnScore = player.id === currentDevicePlayerId;
-        const markerLicencia = !isOwnScore ? currentDeviceLicencia : undefined;
-        playersToSync.push({ playerId: player.id, score: holeScore.score, isOwnScore, markerLicencia });
-        console.log(`[Competition] ✓ Will save - Player ID: ${player.id}, Hole: ${holeNumber}, Score: ${holeScore.score}, isOwn: ${isOwnScore}, markerLicencia: ${markerLicencia}`);
-      }
-    });
-    
-    setPlayerScoresMap((prev) => {
-      const newMap = new Map(prev);
-      newMap.forEach((playerScores, playerId) => {
-        const updatedScores = playerScores.scores.map((score) =>
-          score.holeNumber === holeNumber ? { ...score, saved: true } : score
-        );
-        const savedScores = updatedScores.filter((s) => s.saved);
-        const total = savedScores.reduce((sum, s) => sum + s.score, 0);
-        const totalParPlayed = savedScores.reduce((sum, s) => sum + s.par, 0);
-        newMap.set(playerId, {
-          ...playerScores,
-          scores: updatedScores,
-          totalScore: total,
-          totalPar: totalParPlayed,
-        });
+      const round = await database.get<Round>('rounds').create((r) => {
+        r.mode = 'competition';
+        r.courseName = comp.courseName ?? '';
+        r.routeName = comp.routeName ?? '';
+        r.currentHole = 1;
+        r.status = 'in_progress';
+        r.scoringMode = 'all';
+        r.visiblePlayerIds = '[]';
+        r.holePars = JSON.stringify(pars);
+        r.holeHandicaps = JSON.stringify(hcps);
+        r.groupCode = comp.groupCode;
+        r.competitionName = comp.competitionName;
+        r.eventName = comp.eventName;
+        r.date = comp.date ?? null;
+        r.createdAt = Date.now();
       });
-      return newMap;
-    });
+      roundId = round.id;
 
-    if (competition && competition.codigo_grupo) {
-      for (const { playerId, score, isOwnScore, markerLicencia } of playersToSync) {
-        console.log(`[Competition] Syncing player ${playerId} - hole ${holeNumber} - score ${score} - isOwn: ${isOwnScore} - markerLicencia: ${markerLicencia}`);
-        try {
-          if (isOnline) {
-            const result = await saveHoleScoreToFirebase(
-              competition.codigo_grupo,
-              playerId,
-              holeNumber,
-              score,
-              { isOwnScore, markerLicencia }
-            );
-            
-            if (result.hasConflict) {
-              console.log('[Competition] ⚠️ Conflict detected for player:', playerId);
-              const player = competition.jugadores.find(p => p.id === playerId);
-              return {
-                hasConflict: true,
-                playerId,
-                existingScore: result.existingScore,
-                newScore: score,
-                playerName: player ? `${player.nombre} ${player.apellido}` : 'Jugador',
-              };
-            }
-            
-            console.log(`[Competition] ✅ Hole ${holeNumber} score saved to Firebase for player ${playerId}`);
-          } else {
-            throw new Error('No hay conexión a internet');
-          }
-        } catch (error: any) {
-          if (error.message !== 'No hay conexión a internet') {
-            throw error;
-          }
-          console.log(`[Competition] 💾 Saving hole ${holeNumber} score offline for player ${playerId}`);
-          await addPendingSync({
-            type: 'hole_score',
-            data: {
-              codigoGrupo: competition.codigo_grupo,
-              playerId,
-              holeNumber,
-              score,
-              isOwnScore,
-              markerLicencia,
-            },
+      for (const player of comp.players) {
+        await database.get<RoundPlayer>('round_players').create((rp) => {
+          rp.roundId = round.id;
+          rp.playerExternalId = player.id;
+          rp.firstName = player.firstName;
+          rp.lastName = player.lastName;
+          rp.license = player.license ?? null;
+          rp.handicap = player.handicap ?? null;
+          rp.isLocalDevice = false;
+          rp.status = 'not_started';
+        });
+        for (let i = 1; i <= 18; i++) {
+          await database.get<HoleScoreModel>('hole_scores').create((hs) => {
+            hs.roundId = round.id;
+            hs.playerExternalId = player.id;
+            hs.holeNumber = i;
+            hs.par = pars[i - 1];
+            hs.handicap = hcps[i - 1] ?? 0;
+            hs.score = pars[i - 1];
+            hs.saved = false;
           });
         }
       }
-    }
-  }, [competition, playerScoresMap, isOnline, currentDevicePlayerId, scoringMode, visiblePlayerIds]);
+    });
 
-  const goToNextHole = useCallback(() => {
-    if (currentHole < 18) {
-      setCurrentHole((prev) => prev + 1);
-    }
-  }, [currentHole]);
+    const scoresMap = new Map<string, PlayerScores>();
+    comp.players.forEach((player) => {
+      scoresMap.set(player.id, {
+        playerId: player.id,
+        scores: Array.from({ length: 18 }, (_, i) => ({
+          holeNumber: i + 1, par: pars[i], score: pars[i], saved: false,
+        })),
+        totalScore: 0, totalPar: 72,
+      });
+    });
 
-  const goToPreviousHole = useCallback(() => {
-    if (currentHole > 1) {
-      setCurrentHole((prev) => prev - 1);
-    }
-  }, [currentHole]);
+    setCompetition(comp);
+    setCurrentHole(1);
+    setHolePars(pars);
+    setHoleHandicaps(hcps);
+    setPlayerScoresMap(scoresMap);
+    setActiveRoundId(roundId);
+    setCurrentScreen(undefined);
+    setScoringMode('all');
+    setVisiblePlayerIds([]);
+    setWsLeaderboard(null);
 
-  const goToHole = useCallback((holeNumber: number) => {
-    if (holeNumber >= 1 && holeNumber <= 18) {
-      setCurrentHole(holeNumber);
-    }
+    await syncEngine.record('ROUND_STARTED', {
+      round_id: roundId,
+      mode: 'competition',
+    }, roundId);
+    wsClient.connect(roundId);
   }, []);
 
+  const updateScore = useCallback((playerId: string, holeNumber: number, newScore: number) => {
+    setPlayerScoresMap((prev) => {
+      const next = new Map(prev);
+      const ps = next.get(playerId);
+      if (ps) {
+        next.set(playerId, {
+          ...ps,
+          scores: ps.scores.map((s) => s.holeNumber === holeNumber ? { ...s, score: newScore } : s),
+        });
+      }
+      return next;
+    });
+  }, []);
+
+  const saveHole = useCallback(async (holeNumber: number): Promise<void> => {
+    if (!competition || !activeRoundId) return;
+
+    const visiblePlayers = competition.players.filter(
+      (p) => scoringMode === 'all' || visiblePlayerIds.includes(p.id)
+    );
+
+    await database.write(async () => {
+      const dbScores = await database
+        .get<HoleScoreModel>('hole_scores')
+        .query(Q.and(Q.where('round_id', activeRoundId), Q.where('hole_number', holeNumber)))
+        .fetch();
+
+      for (const dbScore of dbScores) {
+        const inMemory = playerScoresMap.get(dbScore.playerExternalId)?.scores.find((s) => s.holeNumber === holeNumber);
+        if (inMemory) {
+          await dbScore.update((r) => {
+            r.score = inMemory.score;
+            r.saved = true;
+            r.savedAt = Date.now();
+          });
+        }
+      }
+    });
+
+    setPlayerScoresMap((prev) => {
+      const next = new Map(prev);
+      next.forEach((ps, id) => {
+        const updated = ps.scores.map((s) => s.holeNumber === holeNumber ? { ...s, saved: true } : s);
+        const saved = updated.filter((s) => s.saved);
+        next.set(id, { ...ps, scores: updated, totalScore: saved.reduce((n, s) => n + s.score, 0), totalPar: saved.reduce((n, s) => n + s.par, 0) });
+      });
+      return next;
+    });
+
+    // ONE event for the whole group (spec v2.4.0 §2.2)
+    const scores = visiblePlayers
+      .map((player) => {
+        const holeScore = playerScoresMap.get(player.id)?.scores.find((s) => s.holeNumber === holeNumber);
+        return holeScore ? { player_id: player.id, score: holeScore.score } : null;
+      })
+      .filter((s): s is { player_id: string; score: number } => s !== null);
+
+    if (scores.length > 0) {
+      await syncEngine.record('HOLE_SAVED', { round_id: activeRoundId, hole_number: holeNumber, scores }, activeRoundId);
+    }
+  }, [competition, activeRoundId, playerScoresMap, scoringMode, visiblePlayerIds]);
+
+  const goToNextHole = useCallback(() => setCurrentHole((h) => Math.min(h + 1, 18)), []);
+  const goToPreviousHole = useCallback(() => setCurrentHole((h) => Math.max(h - 1, 1)), []);
+  const goToHole = useCallback((n: number) => { if (n >= 1 && n <= 18) setCurrentHole(n); }, []);
+
   const isHoleSaved = useCallback((holeNumber: number): boolean => {
-    const firstPlayer = Array.from(playerScoresMap.values())[0];
-    if (!firstPlayer) return false;
-    const hole = firstPlayer.scores.find((s) => s.holeNumber === holeNumber);
-    return hole?.saved || false;
+    const first = Array.from(playerScoresMap.values())[0];
+    return first?.scores.find((s) => s.holeNumber === holeNumber)?.saved ?? false;
   }, [playerScoresMap]);
 
   const allHolesSaved = useMemo(() => {
-    if (playerScoresMap.size === 0) return false;
-    const firstPlayer = Array.from(playerScoresMap.values())[0];
-    return firstPlayer.scores.every((s) => s.saved);
+    const first = Array.from(playerScoresMap.values())[0];
+    return !!first && first.scores.every((s) => s.saved);
   }, [playerScoresMap]);
 
-  const [firebaseScoresData, setFirebaseScoresData] = useState<{ [key: string]: any } | null>(null);
+  const resetCompetition = useCallback(async () => {
+    if (activeRoundId) {
+      await database.write(async () => {
+        const holeScores = await database.get<HoleScoreModel>('hole_scores').query(Q.where('round_id', activeRoundId)).fetch();
+        for (const hs of holeScores) await hs.destroyPermanently();
+        const roundPlayers = await database.get<RoundPlayer>('round_players').query(Q.where('round_id', activeRoundId)).fetch();
+        for (const rp of roundPlayers) await rp.destroyPermanently();
+        const round = await database.get<Round>('rounds').find(activeRoundId);
+        await round.destroyPermanently();
+      });
+      wsClient.disconnect();
+    }
+    setCompetition(null);
+    setCurrentHole(1);
+    setHolePars(generateHolePars());
+    setPlayerScoresMap(new Map());
+    setCurrentScreen(undefined);
+    setActiveRoundId(null);
+    setWsLeaderboard(null);
+  }, [activeRoundId]);
 
-  useEffect(() => {
-    if (!competition || !competition.codigo_grupo) return;
+  const finishCompetition = useCallback(async () => {
+    if (!competition || !activeRoundId) return;
 
-    console.log('[Competition] Subscribing to real-time competition scores...');
-    const unsubscribe = subscribeToCompetitionScores(
-      competition.codigo_grupo,
-      (playersData) => {
-        console.log('[Competition] Real-time scores updated from Firebase');
-        setFirebaseScoresData(playersData);
-      }
-    );
+    await database.write(async () => {
+      const round = await database.get<Round>('rounds').find(activeRoundId);
+      await round.update((r) => { r.status = 'finished'; r.finishedAt = Date.now(); });
+    });
 
-    return () => {
-      console.log('[Competition] Unsubscribing from competition scores');
-      unsubscribe();
-    };
-  }, [competition?.codigo_grupo]);
+    await syncEngine.record('ROUND_FINISHED', { round_id: activeRoundId }, activeRoundId);
+    await syncEngine.flush();
+  }, [competition, activeRoundId]);
+
+  const setDevicePlayerId = useCallback(async (playerId: string) => {
+    await setAppConfig('currentDevicePlayerId', playerId);
+    setCurrentDevicePlayerId(playerId);
+  }, []);
+
+  const clearDevicePlayerId = useCallback(async () => {
+    await removeAppConfig('currentDevicePlayerId');
+    setCurrentDevicePlayerId(null);
+  }, []);
+
+  const setScoringModeAndPlayers = useCallback(async (mode: 'all' | 'partial', playerIds?: string[]) => {
+    const ids = playerIds ?? [];
+    setScoringMode(mode);
+    setVisiblePlayerIds(ids);
+    if (activeRoundId) {
+      await database.write(async () => {
+        const round = await database.get<Round>('rounds').find(activeRoundId);
+        await round.update((r) => { r.scoringMode = mode; r.visiblePlayerIds = JSON.stringify(ids); });
+      });
+    }
+  }, [activeRoundId]);
+
+  const updateCurrentScreen = useCallback((screenName: string) => setCurrentScreen(screenName), []);
+
+  // ─── Leaderboard (WebSocket > local) ────────────────────────────────────────
 
   const leaderboard = useMemo(() => {
-    const players = competition?.jugadores || [];
+    const players = competition?.players ?? [];
     if (!players.length) return [];
 
-    const getMarkerForPlayer = (playerId: string): { markerId: string; markerLicencia: string } | null => {
-      const playerIndex = players.findIndex(p => p.id === playerId);
-      if (playerIndex === -1) return null;
-      const markerIndex = (playerIndex - 1 + players.length) % players.length;
-      const marker = players[markerIndex];
-      return { markerId: marker.id, markerLicencia: marker.licencia || '' };
-    };
+    if (wsLeaderboard) {
+      return wsLeaderboard.map((entry) => {
+        const player = players.find((p) => p.id === entry.player_id);
+        return {
+          player: player ?? { id: entry.player_id, firstName: entry.first_name, lastName: entry.last_name },
+          totalScore: entry.total_score,
+          totalPar: 0,
+          score: entry.vs_par,
+          holesCompleted: entry.holes_completed,
+          position: entry.position,
+        };
+      });
+    }
 
     return players
       .map((player) => {
-        const localScores = playerScoresMap.get(player.id);
-        const marker = getMarkerForPlayer(player.id);
-        const markerLicencia = marker?.markerLicencia || '';
-
-        let markerTotalScore = 0;
-        let markerHolesCompleted = 0;
-        let markerTotalPar = 0;
-
-        if (firebaseScoresData && firebaseScoresData[player.id] && markerLicencia) {
-          const playerFirebaseData = firebaseScoresData[player.id];
-          const markerField = `golpes_${markerLicencia}`;
-          console.log(`[Competition] Leaderboard calc for ${player.nombre}: marker field = ${markerField}`);
-
-          for (let h = 1; h <= 18; h++) {
-            const holeData = playerFirebaseData[`hoyo_${h}`];
-            if (holeData && holeData[markerField] !== undefined) {
-              markerTotalScore += holeData[markerField];
-              markerHolesCompleted++;
-              markerTotalPar += holePars[h - 1] || 4;
-            }
-          }
-        }
-
-        const useFirebaseScore = markerHolesCompleted > 0;
-        const totalScore = useFirebaseScore ? markerTotalScore : (localScores?.totalScore || 0);
-        const totalPar = useFirebaseScore ? markerTotalPar : (localScores?.totalPar || 72);
-        const holesCompleted = useFirebaseScore
-          ? markerHolesCompleted
-          : (localScores?.scores.filter((s) => s.saved).length || 0);
-
+        const ps = playerScoresMap.get(player.id);
+        const saved = ps?.scores.filter((s) => s.saved) ?? [];
         return {
           player,
-          totalScore,
-          totalPar,
-          score: holesCompleted > 0 ? totalScore - totalPar : 0,
-          holesCompleted,
+          totalScore: ps?.totalScore ?? 0,
+          totalPar: ps?.totalPar ?? 72,
+          score: saved.length > 0 ? (ps?.totalScore ?? 0) - (ps?.totalPar ?? 0) : 0,
+          holesCompleted: saved.length,
         };
       })
       .sort((a, b) => {
@@ -446,131 +444,27 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
         if (b.holesCompleted === 0) return -1;
         return a.score - b.score;
       });
-  }, [competition, playerScoresMap, firebaseScoresData, holePars]);
-
-  const resetCompetition = useCallback(() => {
-    console.log('[Competition] Resetting competition...');
-    setCompetition(null);
-    setCurrentHole(1);
-    setHolePars(generateHolePars());
-    setPlayerScoresMap(new Map());
-    setCurrentScreen(undefined);
-    clearLocalGameData();
-  }, []);
-
-  const finishCompetition = useCallback(async () => {
-    if (!competition) return;
-    
-    const scores = Array.from(playerScoresMap.values());
-    
-    if (isOnline && competition.codigo_grupo) {
-      try {
-        await syncCompetitionResults(competition.codigo_grupo, scores);
-        console.log('[Competition] Competition results synced immediately');
-      } catch (error) {
-        console.error('[Competition] Error syncing results, will retry later:', error);
-        await addPendingSync({
-          type: 'competition_result',
-          data: {
-            codigoGrupo: competition.codigo_grupo,
-            scores,
-          },
-        });
-      }
-    } else if (competition.codigo_grupo) {
-      await addPendingSync({
-        type: 'competition_result',
-        data: {
-          codigoGrupo: competition.codigo_grupo,
-          scores,
-        },
-      });
-      console.log('[Competition] Competition results queued for sync');
-    }
-  }, [competition, playerScoresMap, isOnline]);
-
-  const setDevicePlayerId = useCallback(async (playerId: string) => {
-    console.log('[Competition] Setting device player ID:', playerId);
-    await AsyncStorage.setItem('currentDevicePlayerId', playerId);
-    setCurrentDevicePlayerId(playerId);
-  }, []);
-
-  const setScoringModeAndPlayers = useCallback((mode: 'all' | 'partial', playerIds?: string[]) => {
-    console.log('[Competition] Setting scoring mode:', mode, 'playerIds:', playerIds);
-    setScoringMode(mode);
-    if (playerIds) {
-      setVisiblePlayerIds(playerIds);
-    }
-  }, []);
-
-  const clearDevicePlayerId = useCallback(async () => {
-    console.log('[Competition] Clearing device player ID');
-    await AsyncStorage.removeItem('currentDevicePlayerId');
-    setCurrentDevicePlayerId(null);
-  }, []);
-
-  const updateCurrentScreen = useCallback((screenName: string) => {
-    console.log('[Competition] Updating current screen:', screenName);
-    setCurrentScreen(screenName);
-  }, []);
+  }, [competition, playerScoresMap, wsLeaderboard]);
 
   return useMemo(() => ({
-    competition,
-    currentHole,
-    holePars,
-    holeHandicaps,
-    playerScoresMap,
-    isOnline,
-    isLoaded,
-    currentDevicePlayerId,
-    deviceId,
-    currentScreen,
-    scoringMode,
-    visiblePlayerIds,
-    firebaseScoresData,
-    startCompetition,
-    updateScore,
-    saveHole,
-    goToNextHole,
-    goToPreviousHole,
-    goToHole,
-    isHoleSaved,
-    allHolesSaved,
-    leaderboard,
-    resetCompetition,
-    finishCompetition,
-    setDevicePlayerId,
-    clearDevicePlayerId,
-    updateCurrentScreen,
-    setScoringModeAndPlayers,
+    competition, currentHole, holePars, holeHandicaps, playerScoresMap,
+    isOnline, isLoaded, currentDevicePlayerId, deviceId, currentScreen,
+    scoringMode, visiblePlayerIds,
+    startCompetition, updateScore, saveHole,
+    goToNextHole, goToPreviousHole, goToHole,
+    isHoleSaved, allHolesSaved, leaderboard,
+    resetCompetition, finishCompetition,
+    setDevicePlayerId, clearDevicePlayerId,
+    updateCurrentScreen, setScoringModeAndPlayers,
   }), [
-    competition,
-    currentHole,
-    holePars,
-    holeHandicaps,
-    playerScoresMap,
-    isOnline,
-    isLoaded,
-    currentDevicePlayerId,
-    deviceId,
-    currentScreen,
-    scoringMode,
-    visiblePlayerIds,
-    firebaseScoresData,
-    startCompetition,
-    updateScore,
-    saveHole,
-    goToNextHole,
-    goToPreviousHole,
-    goToHole,
-    isHoleSaved,
-    allHolesSaved,
-    leaderboard,
-    resetCompetition,
-    finishCompetition,
-    setDevicePlayerId,
-    clearDevicePlayerId,
-    updateCurrentScreen,
-    setScoringModeAndPlayers,
+    competition, currentHole, holePars, holeHandicaps, playerScoresMap,
+    isOnline, isLoaded, currentDevicePlayerId, deviceId, currentScreen,
+    scoringMode, visiblePlayerIds,
+    startCompetition, updateScore, saveHole,
+    goToNextHole, goToPreviousHole, goToHole,
+    isHoleSaved, allHolesSaved, leaderboard,
+    resetCompetition, finishCompetition,
+    setDevicePlayerId, clearDevicePlayerId,
+    updateCurrentScreen, setScoringModeAndPlayers,
   ]);
 });

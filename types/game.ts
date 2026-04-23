@@ -1,10 +1,10 @@
 export interface Player {
   id: string;
-  nombre: string;
-  apellido: string;
-  licencia?: string;
+  firstName: string;
+  lastName: string;
+  license?: string;
   handicap?: number;
-  preparado?: boolean;
+  isReady?: boolean;
   isDevice?: boolean;
 }
 
@@ -23,13 +23,13 @@ export interface PlayerScores {
 }
 
 export interface Competition {
-  codigo_grupo: string;
-  nombre_competicion: string;
-  nombre_prueba: string;
-  jugadores: Player[];
-  fecha?: string;
-  campo?: string;
-  recorrido?: string;
+  groupCode: string;
+  competitionName: string;
+  eventName: string;
+  players: Player[];
+  date?: string;
+  courseName?: string;
+  routeName?: string;
 }
 
 export interface GameState {
@@ -41,16 +41,16 @@ export interface GameState {
 }
 
 export interface FirebaseCompetitionData {
-  codigo_grupo: string;
-  nombre_competicion: string;
-  nombre_prueba: string;
-  jugadores: {
+  group_code: string;
+  competition_name: string;
+  event_name: string;
+  players: {
     id: string;
-    nombre: string;
-    apellido: string;
-    licencia: string;
+    first_name: string;
+    last_name: string;
+    license: string;
     handicap?: number;
   }[];
-  campo?: string;
-  recorrido?: string;
+  course_name?: string;
+  route_name?: string;
 }

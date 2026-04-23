@@ -114,7 +114,7 @@ export default function CompleteScreen() {
                 <Text style={styles.positionText}>{index + 1}</Text>
               </View>
               <Text style={styles.playerName}>
-                {entry.player.nombre} {entry.player.apellido}
+                {entry.player.firstName} {entry.player.lastName}
               </Text>
               <Text
                 style={[

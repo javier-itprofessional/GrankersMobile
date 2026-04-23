@@ -12,7 +12,6 @@ export default function ComprobacionScreen() {
     currentDevicePlayerId,
     playerScoresMap,
     holePars,
-    firebaseScoresData,
     resetCompetition,
     updateCurrentScreen,
     goToHole,
@@ -34,16 +33,16 @@ export default function ComprobacionScreen() {
 
   const myPlayer = useMemo(() => {
     if (!competition || !currentDevicePlayerId) return null;
-    return competition.jugadores.find(p => p.id === currentDevicePlayerId) ?? null;
+    return competition.players.find(p => p.id === currentDevicePlayerId) ?? null;
   }, [competition, currentDevicePlayerId]);
 
   const markerPlayer = useMemo(() => {
     if (!competition || !currentDevicePlayerId) return null;
-    const jugadores = competition.jugadores;
-    const myIndex = jugadores.findIndex(p => p.id === currentDevicePlayerId);
+    const players = competition.players;
+    const myIndex = players.findIndex(p => p.id === currentDevicePlayerId);
     if (myIndex === -1) return null;
-    const prevIndex = (myIndex - 1 + jugadores.length) % jugadores.length;
-    return jugadores[prevIndex];
+    const prevIndex = (myIndex - 1 + players.length) % players.length;
+    return players[prevIndex];
   }, [competition, currentDevicePlayerId]);
 
   const myOwnScores = useMemo(() => {
@@ -55,35 +54,27 @@ export default function ComprobacionScreen() {
     return { totalStrokes, totalPar, diff: totalStrokes - totalPar };
   }, [currentDevicePlayerId, playerScoresMap]);
 
+  // Marker scores are delivered via WebSocket (score_confirmed events) and reflected in playerScoresMap
   const markerScoresForMe = useMemo(() => {
-    if (!firebaseScoresData || !currentDevicePlayerId || !markerPlayer) return null;
+    if (!currentDevicePlayerId || !markerPlayer) return null;
 
-    const myFirebaseData = firebaseScoresData[currentDevicePlayerId];
-    if (!myFirebaseData) return null;
+    const markerScores = playerScoresMap.get(markerPlayer.id);
+    if (!markerScores) return null;
 
-    const markerLicencia = markerPlayer.licencia || '';
-    const markerField = `golpes_${markerLicencia}`;
+    const savedScores = markerScores.scores.filter((s) => s.saved);
+    const totalStrokes = savedScores.reduce((sum, s) => sum + s.score, 0);
+    const totalPar = savedScores.reduce((sum, s) => sum + s.par, 0);
+    const holeScores = savedScores.map((s) => ({ hole: s.holeNumber, score: s.score, par: s.par }));
 
-    let totalStrokes = 0;
-    let holesCompleted = 0;
-    let totalPar = 0;
-    const holeScores: { hole: number; score: number; par: number }[] = [];
-
-    for (let h = 1; h <= 18; h++) {
-      const holeData = myFirebaseData[`hoyo_${h}`];
-      if (holeData && holeData[markerField] !== undefined) {
-        const score = holeData[markerField];
-        totalStrokes += score;
-        holesCompleted++;
-        totalPar += holePars[h - 1] || 4;
-        holeScores.push({ hole: h, score, par: holePars[h - 1] || 4 });
-      }
-    }
-
-    const allHolesCompleted = holesCompleted === 18;
-
-    return { totalStrokes, totalPar, diff: totalStrokes - totalPar, holesCompleted, allHolesCompleted, holeScores };
-  }, [firebaseScoresData, currentDevicePlayerId, markerPlayer, holePars]);
+    return {
+      totalStrokes,
+      totalPar,
+      diff: totalStrokes - totalPar,
+      holesCompleted: savedScores.length,
+      allHolesCompleted: savedScores.length === 18,
+      holeScores,
+    };
+  }, [currentDevicePlayerId, markerPlayer, playerScoresMap]);
 
   const formatDiff = useCallback((diff: number) => {
     if (diff > 0) return `+${diff}`;
@@ -141,7 +132,7 @@ export default function ComprobacionScreen() {
 
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Comprobación de resultado</Text>
-        <Text style={styles.headerSubtitle}>{competition.nombre_competicion}</Text>
+        <Text style={styles.headerSubtitle}>{competition.competitionName}</Text>
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
@@ -153,7 +144,7 @@ export default function ComprobacionScreen() {
 
           <View style={styles.blockContent}>
             <Text style={styles.markerName}>
-              {markerPlayer ? `${markerPlayer.nombre} ${markerPlayer.apellido}` : 'Marcador desconocido'}
+              {markerPlayer ? `${markerPlayer.firstName} ${markerPlayer.lastName}` : 'Marcador desconocido'}
             </Text>
 
             {markerScoresForMe && markerScoresForMe.allHolesCompleted ? (
@@ -192,7 +183,7 @@ export default function ComprobacionScreen() {
 
           <View style={styles.blockContent}>
             <Text style={styles.markerName}>
-              {myPlayer.nombre} {myPlayer.apellido}
+              {myPlayer.firstName} {myPlayer.lastName}
             </Text>
 
             {myOwnScores ? (

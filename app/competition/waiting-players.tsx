@@ -3,16 +3,9 @@ import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { Users, Check, WifiOff, Square, CheckSquare, UserCheck, UsersRound } from 'lucide-react-native';
 import { useState, useEffect, useMemo } from 'react';
 import Colors from '../../constants/colors';
-import { subscribeToCompetitionPlayers, updatePlayerConnectionStatus } from '@/config/firebase';
+import { subscribeToCompetitionPlayers, updatePlayerConnectionStatus } from '@/services/game-service';
+import type { PlayerStatus } from '@/services/game-service';
 import { useCompetition } from '@/providers/CompetitionProvider';
-
-interface PlayerStatus {
-  id: string;
-  nombre: string;
-  apellido: string;
-  deviceId?: string;
-  estado?: string;
-}
 
 export default function CompetitionWaitingPlayersScreen() {
   const router = useRouter();
@@ -23,8 +16,8 @@ export default function CompetitionWaitingPlayersScreen() {
     params.competitionData ? JSON.parse(params.competitionData) : competition,
     [params.competitionData, competition]
   );
-  const codigoGrupo = competitionData?.codigo_grupo || '';
-  const players = useMemo(() => competitionData?.jugadores || [], [competitionData]);
+  const groupCode = competitionData?.group_code || '';
+  const players = useMemo(() => competitionData?.players || [], [competitionData]);
   const myPlayerId = params.myPlayerId || currentDevicePlayerId || null;
 
   const [playersStatus, setPlayersStatus] = useState<PlayerStatus[]>([]);
@@ -42,30 +35,18 @@ export default function CompetitionWaitingPlayersScreen() {
   }, []);
 
   useEffect(() => {
-    if (!codigoGrupo) {
+    if (!groupCode) {
       console.log('[CompetitionWaiting] Missing competition code');
       return;
     }
 
-    console.log('[CompetitionWaiting] Subscribing to players for code:', codigoGrupo);
+    console.log('[CompetitionWaiting] Subscribing to players for code:', groupCode);
 
-    const unsubscribe = subscribeToCompetitionPlayers(codigoGrupo, (data) => {
-      console.log('[CompetitionWaiting] Players data received:', data);
-
-      const playersList: PlayerStatus[] = [];
-
-      players.forEach((player: { id: string; nombre: string; apellido: string }) => {
-        const fbPlayer = data[player.id];
-        playersList.push({
-          id: player.id,
-          nombre: player.nombre,
-          apellido: player.apellido,
-          deviceId: fbPlayer?.deviceId,
-          estado: fbPlayer?.estado,
-        });
-      });
-
-      console.log('[CompetitionWaiting] Processed players:', playersList);
+    const knownPlayers = players.map((p: { id: string; first_name: string; last_name: string }) => ({
+      id: p.id, firstName: p.first_name, lastName: p.last_name,
+    }));
+    const unsubscribe = subscribeToCompetitionPlayers(groupCode, knownPlayers, (playersList) => {
+      console.log('[CompetitionWaiting] Players data received:', playersList);
       setPlayersStatus(playersList);
 
       setOfflinePlayers(prev => {
@@ -80,10 +61,10 @@ export default function CompetitionWaitingPlayersScreen() {
     });
 
     return () => {
-      console.log('[CompetitionWaiting] Unsubscribing from Firebase listener');
+      console.log('[CompetitionWaiting] Unsubscribing from WebSocket listener');
       unsubscribe();
     };
-  }, [codigoGrupo, players]);
+  }, [groupCode, players]);
 
   useEffect(() => {
     const effectiveConnected = playersStatus.filter((p, idx) => p.deviceId || offlinePlayers.has(idx)).length;
@@ -138,10 +119,10 @@ export default function CompetitionWaitingPlayersScreen() {
       return newSet;
     });
 
-    if (codigoGrupo && player.id) {
+    if (groupCode && player.id) {
       try {
         if (newStatus === 'offline') {
-          await updatePlayerConnectionStatus(codigoGrupo, player.id, 'offline');
+          await updatePlayerConnectionStatus(groupCode, player.id, 'withdrawn');
           console.log('[CompetitionWaiting] Player', player.id, 'marked as offline in Firebase');
         }
       } catch (error) {
@@ -227,7 +208,7 @@ export default function CompetitionWaitingPlayersScreen() {
                   (isConnected || isOffline) && styles.playerNameConnected,
                   player.id === myPlayerId && styles.playerNameHighlighted,
                 ]}>
-                  {player.nombre} {player.apellido}{player.id === myPlayerId ? ' (Tú)' : ''}
+                  {player.firstName} {player.lastName}{player.id === myPlayerId ? ' (Tú)' : ''}
                 </Text>
                 
                 {!isConnected && (

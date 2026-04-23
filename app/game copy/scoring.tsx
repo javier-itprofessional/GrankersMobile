@@ -47,10 +47,10 @@ export default function ScoringScreen() {
   const { gameName, groupName } = useFreePlay();
 
   const competition = isCompetitionMode ? competitionData : (isFreePlayMode ? {
-    codigo_grupo: '',
-    nombre_competicion: gameName || 'Partida Libre',
-    nombre_prueba: groupName || 'Grupo',
-    jugadores: players,
+    groupCode: '',
+    competitionName: gameName || 'Partida Libre',
+    eventName: groupName || 'Grupo',
+    players,
   } : null);
 
   const currentHole = isCompetitionMode ? compHole : freeHole;
@@ -67,25 +67,25 @@ export default function ScoringScreen() {
 
   const marcandoPlayerId = useMemo(() => {
     if (!isCompetitionMode || !competition || !currentDevicePlayerId) return null;
-    const jugadores = competition.jugadores;
-    const myIndex = jugadores.findIndex(p => p.id === currentDevicePlayerId);
+    const players = competition.players;
+    const myIndex = players.findIndex(p => p.id === currentDevicePlayerId);
     if (myIndex === -1) return null;
-    const nextIndex = (myIndex + 1) % jugadores.length;
-    return jugadores[nextIndex].id;
+    const nextIndex = (myIndex + 1) % players.length;
+    return players[nextIndex].id;
   }, [isCompetitionMode, competition, currentDevicePlayerId]);
 
   const miMarcadorId = useMemo(() => {
     if (!isCompetitionMode || !competition || !currentDevicePlayerId) return null;
-    const jugadores = competition.jugadores;
-    const myIndex = jugadores.findIndex(p => p.id === currentDevicePlayerId);
+    const players = competition.players;
+    const myIndex = players.findIndex(p => p.id === currentDevicePlayerId);
     if (myIndex === -1) return null;
-    const prevIndex = (myIndex - 1 + jugadores.length) % jugadores.length;
-    return jugadores[prevIndex].id;
+    const prevIndex = (myIndex - 1 + players.length) % players.length;
+    return players[prevIndex].id;
   }, [isCompetitionMode, competition, currentDevicePlayerId]);
 
   const sortedPlayers = useMemo(() => {
     if (!competition) return [];
-    let filtered = competition.jugadores;
+    let filtered = competition.players;
     if (isCompetitionMode && scoringMode === 'partial') {
       filtered = filtered.filter(p => visiblePlayerIds.includes(p.id));
     }
@@ -311,8 +311,8 @@ export default function ScoringScreen() {
             onPress={handlePruebaPress}
             testID="prueba-button"
           >
-            <Text style={styles.competitionName}>{competition.nombre_competicion}</Text>
-            <Text style={styles.pruebaText}>{competition.nombre_prueba}</Text>
+            <Text style={styles.competitionName}>{competition.competitionName}</Text>
+            <Text style={styles.pruebaText}>{competition.eventName}</Text>
           </TouchableOpacity>
 
           <View style={styles.holeInfo}>
@@ -410,7 +410,7 @@ export default function ScoringScreen() {
                     {isMe && <View style={styles.meDot} />}
                     {isMarcando && <View style={styles.marcandoDot} />}
                     <Text style={[styles.playerName, isMe && styles.playerNameMe, isMarcando && styles.playerNameMarcando]} numberOfLines={1}>
-                      {player.nombre} {player.apellido}
+                      {player.firstName} {player.lastName}
                     </Text>
                     {isMe && <Text style={styles.tagMe}>Tú</Text>}
                     {isMarcando && <Text style={styles.tagMarcando}>Marcando</Text>}

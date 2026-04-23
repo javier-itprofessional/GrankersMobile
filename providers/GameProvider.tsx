@@ -1,17 +1,8 @@
 import createContextHook from '@nkzw/create-context-hook';
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import type { Competition, PlayerScores, HoleScore } from '../types/game';
-import {
-  saveGameDataLocally,
-  loadGameDataLocally,
-  clearLocalGameData,
-  addPendingSync,
-  getPendingSync,
-  removePendingSync,
-  subscribeToConnectionChanges,
-  generateDeviceId,
-} from '@/lib/offline-sync';
-import { syncCompetitionResults, saveHoleScoreToFirebase } from '@/config/firebase';
+import { subscribeToConnectionChanges, generateDeviceId } from '@/lib/offline-sync';
+import { syncEngine } from '@/services/sync-engine';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const generateHolePars = (): number[] => {
@@ -74,28 +65,9 @@ export const [GameProvider, useGame] = createContextHook(() => {
 
   const syncPendingData = useCallback(async () => {
     console.log('Syncing pending data...');
-    const pending = await getPendingSync();
-    
-    for (const item of pending) {
-      try {
-        if (item.type === 'competition_result') {
-          await syncCompetitionResults(item.data.codigoGrupo, item.data.scores);
-          await removePendingSync(item.id);
-          console.log('Synced item:', item.id);
-        } else if (item.type === 'hole_score') {
-          await saveHoleScoreToFirebase(
-            item.data.codigoGrupo,
-            item.data.playerId,
-            item.data.holeNumber,
-            item.data.score
-          );
-          await removePendingSync(item.id);
-          console.log('Synced hole score:', item.id);
-        }
-      } catch (error) {
-        console.error('Error syncing item:', item.id, error);
-      }
-    }
+    await syncEngine.flush().catch((error) => {
+      console.error('Error flushing sync engine:', error);
+    });
   }, []);
 
   useEffect(() => {
@@ -104,16 +76,8 @@ export const [GameProvider, useGame] = createContextHook(() => {
       setDeviceId(generatedDeviceId);
       console.log('Device ID initialized:', generatedDeviceId);
       
-      const savedData = await loadGameDataLocally();
-      if (savedData) {
-        console.log('Loading saved game data...');
-        setCompetition(savedData.competition);
-        setPlayerScoresMap(savedData.playerScoresMap);
-        setCurrentHole(savedData.currentHole);
-        setHolePars(savedData.holePars);
-        setIsCompetition(savedData.isCompetition);
-        setCurrentScreen(savedData.currentScreen);
-      }
+      // Legacy GameProvider: game state is now managed by CompetitionProvider via WatermelonDB
+
       
       const devicePlayerId = await AsyncStorage.getItem('currentDevicePlayerId');
       if (devicePlayerId) {
@@ -137,32 +101,18 @@ export const [GameProvider, useGame] = createContextHook(() => {
     return unsubscribe;
   }, [syncPendingData]);
 
-  useEffect(() => {
-    if (isLoaded && competition) {
-      saveGameDataLocally({
-        competition,
-        playerScoresMap,
-        currentHole,
-        holePars,
-        isCompetition,
-        currentScreen,
-      }).catch((error) => {
-        console.error('Error saving game data:', error);
-      });
-    }
-  }, [competition, playerScoresMap, currentHole, holePars, isCompetition, currentScreen, isLoaded]);
 
   const startCompetition = useCallback((comp: Competition) => {
     console.log('Starting competition:', comp);
-    console.log('Player IDs:', comp.jugadores.map(p => p.id));
+    console.log('Player IDs:', comp.players.map(p => p.id));
     setCompetition(comp);
     setIsCompetition(true);
     setCurrentHole(1);
     const pars = generateHolePars();
     setHolePars(pars);
-    
+
     const scoresMap = new Map<string, PlayerScores>();
-    comp.jugadores.forEach((player) => {
+    comp.players.forEach((player) => {
       console.log(`Creating score map for player: ${player.id}`);
       const scores: HoleScore[] = [];
       for (let i = 1; i <= 18; i++) {
@@ -184,18 +134,18 @@ export const [GameProvider, useGame] = createContextHook(() => {
     setPlayerScoresMap(scoresMap);
   }, []);
 
-  const startFreePlay = useCallback((players: { id: string; nombre: string; apellido: string }[]) => {
+  const startFreePlay = useCallback((players: { id: string; firstName: string; lastName: string }[]) => {
     console.log('Starting free play with players:', players);
     setIsCompetition(false);
     setCurrentHole(1);
     const pars = generateHolePars();
     setHolePars(pars);
-    
+
     const comp: Competition = {
-      codigo_grupo: '',
-      nombre_competicion: 'Partida Libre',
-      nombre_prueba: 'Partida Libre',
-      jugadores: players.map((p) => ({ ...p, handicap: 0 })),
+      groupCode: '',
+      competitionName: 'Free Play',
+      eventName: 'Free Play',
+      players: players.map((p) => ({ ...p, handicap: 0 })),
     };
     setCompetition(comp);
     
@@ -242,7 +192,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
     console.log('=== SAVING HOLE ===');
     console.log('Hole number:', holeNumber);
     console.log('Competition:', competition);
-    console.log('Competition jugadores:', competition?.jugadores.map(j => ({ id: j.id, nombre: j.nombre })));
+    console.log('Competition players:', competition?.players.map(p => ({ id: p.id, firstName: p.firstName })));
     console.log('PlayerScoresMap size:', playerScoresMap.size);
     console.log('PlayerScoresMap keys:', Array.from(playerScoresMap.keys()));
     
@@ -253,8 +203,8 @@ export const [GameProvider, useGame] = createContextHook(() => {
       return;
     }
 
-    competition.jugadores.forEach((player) => {
-      console.log(`Processing player from competition - ID: ${player.id}, Name: ${player.nombre}`);
+    competition.players.forEach((player) => {
+      console.log(`Processing player from competition - ID: ${player.id}, Name: ${player.firstName}`);
       const playerScores = playerScoresMap.get(player.id);
       
       if (!playerScores) {
@@ -271,49 +221,18 @@ export const [GameProvider, useGame] = createContextHook(() => {
       }
     });
 
-    if (competition && competition.codigo_grupo) {
+    if (competition && competition.groupCode) {
+      const roundId = competition.groupCode;
+      const playerHoleScores = Array.from(playerScoresMap.values()).flatMap((ps) =>
+        ps.scores.filter((s) => s.holeNumber === holeNumber)
+      );
       for (const { playerId, score } of playersToSync) {
-        console.log(`Syncing player ${playerId} - hole ${holeNumber} - score ${score}`);
-        try {
-          if (isOnline) {
-            const result = await saveHoleScoreToFirebase(
-              competition.codigo_grupo,
-              playerId,
-              holeNumber,
-              score
-            );
-            
-            if (result.hasConflict) {
-              console.log('⚠️ Conflict detected for player:', playerId);
-              const player = competition.jugadores.find(p => p.id === playerId);
-              return {
-                hasConflict: true,
-                playerId,
-                existingScore: result.existingScore,
-                newScore: score,
-                playerName: player ? `${player.nombre} ${player.apellido}` : 'Jugador',
-              };
-            }
-            
-            console.log(`✅ Hole ${holeNumber} score saved to Firebase for player ${playerId}`);
-          } else {
-            throw new Error('No hay conexión a internet');
-          }
-        } catch (error: any) {
-          if (error.message !== 'No hay conexión a internet') {
-            throw error;
-          }
-          console.log(`💾 Saving hole ${holeNumber} score offline for player ${playerId}`);
-          await addPendingSync({
-            type: 'hole_score',
-            data: {
-              codigoGrupo: competition.codigo_grupo,
-              playerId,
-              holeNumber,
-              score,
-            },
-          });
-        }
+        const holeData = playerHoleScores.find((s) => s.holeNumber === holeNumber);
+        await syncEngine.record(
+          'HOLE_SAVED',
+          { round_id: roundId, player_id: playerId, hole_number: holeNumber, strokes: score },
+          roundId
+        ).catch(() => {});
       }
     }
     
@@ -369,7 +288,7 @@ export const [GameProvider, useGame] = createContextHook(() => {
   }, [playerScoresMap]);
 
   const leaderboard = useMemo(() => {
-    const players = competition?.jugadores || [];
+    const players = competition?.players || [];
     return players
       .map((player) => {
         const scores = playerScoresMap.get(player.id);
@@ -391,39 +310,18 @@ export const [GameProvider, useGame] = createContextHook(() => {
     setHolePars(generateHolePars());
     setPlayerScoresMap(new Map());
     setCurrentScreen(undefined);
-    clearLocalGameData();
   }, []);
 
   const finishCompetition = useCallback(async () => {
     if (!competition) return;
-    
-    const scores = Array.from(playerScoresMap.values());
-    
-    if (isOnline && competition.codigo_grupo) {
-      try {
-        await syncCompetitionResults(competition.codigo_grupo, scores);
-        console.log('Competition results synced immediately');
-      } catch (error) {
-        console.error('Error syncing results, will retry later:', error);
-        await addPendingSync({
-          type: 'competition_result',
-          data: {
-            codigoGrupo: competition.codigo_grupo,
-            scores,
-          },
-        });
-      }
-    } else if (competition.codigo_grupo) {
-      await addPendingSync({
-        type: 'competition_result',
-        data: {
-          codigoGrupo: competition.codigo_grupo,
-          scores,
-        },
+    if (competition.groupCode) {
+      await syncEngine.record('ROUND_FINISHED', { round_id: competition.groupCode }, competition.groupCode).catch(() => {});
+      await syncEngine.flush().catch((error) => {
+        console.error('Error syncing results:', error);
       });
-      console.log('Competition results queued for sync');
+      console.log('Competition finished, sync engine flushed');
     }
-  }, [competition, playerScoresMap, isOnline]);
+  }, [competition]);
 
   const setDevicePlayerId = useCallback(async (playerId: string) => {
     console.log('Setting device player ID:', playerId);
