@@ -39,7 +39,7 @@ export default function SelectCourseScreen() {
     try {
       setLoading(true);
       const data = await listCourses();
-      setCourses(data.map((c) => c.nombre));
+      setCourses(data.map((c) => c.name));
     } catch (error) {
       console.error('Error loading courses:', error);
       Alert.alert('Error', 'No se pudieron cargar los campos de golf');
@@ -52,8 +52,8 @@ export default function SelectCourseScreen() {
     try {
       setLoadingRoutes(true);
       const data = await listCourses();
-      const course = data.find((c) => c.nombre === courseName);
-      setRoutes(course ? course.routes.map((r) => r.nombre) : []);
+      const course = data.find((c) => c.name === courseName);
+      setRoutes(course ? course.routes.map((r) => r.name) : []);
     } catch (error) {
       console.error('Error loading routes:', error);
       Alert.alert('Error', 'No se pudieron cargar los recorridos');
@@ -140,10 +140,10 @@ export default function SelectCourseScreen() {
       if (gamePlayers) {
         const playersArray = Object.entries(gamePlayers).map(([key, value]: [string, any]) => ({
           id: key,
-          nombre: value.nombre || '',
-          apellido: value.apellido || '',
+          firstName: value.nombre || value.firstName || '',
+          lastName: value.apellido || value.lastName || '',
           handicap: value.handicap || '0',
-          licencia: value.licencia,
+          license: value.licencia || value.license,
         }));
 
         router.push({

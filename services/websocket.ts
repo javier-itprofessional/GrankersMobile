@@ -2,27 +2,21 @@ import { AuthStorage } from './auth-storage';
 
 const WS_URL = process.env.EXPO_PUBLIC_WS_URL;
 
-// ─── Tipos de eventos recibidos del backend ───────────────────────────────────
+// ─── Tipos de eventos recibidos del backend (spec v2.4.0) ─────────────────────
 
 export interface LeaderboardEntry {
+  position: number;
   player_id: string;
-  nombre: string;
-  apellido: string;
+  first_name: string;
+  last_name: string;
   total_score: number;
-  total_par: number;
   vs_par: number;
   holes_completed: number;
 }
 
-export interface ScoreConfirmedEvent {
-  player_id: string;
-  hole_number: number;
-  score: number;
-}
-
 export interface PlayerStatusEvent {
   player_id: string;
-  status: 'preparado' | 'conectado' | 'no_presentado' | 'pendiente';
+  status: 'not_started' | 'ready' | 'playing' | 'finished' | 'withdrawn';
 }
 
 export type WsEventType =
@@ -33,9 +27,9 @@ export type WsEventType =
 
 export type WsEventPayload = {
   leaderboard_updated: { round_id: string; leaderboard: LeaderboardEntry[] };
-  score_confirmed: { round_id: string } & ScoreConfirmedEvent;
-  player_status_changed: { round_id: string } & PlayerStatusEvent;
-  round_finished: { round_id: string };
+  score_confirmed: { action_id: string; materialized: boolean };
+  player_status_changed: PlayerStatusEvent;
+  round_finished: { round_id: string; closed_at: string };
 };
 
 type Listener<T extends WsEventType> = (payload: WsEventPayload[T]) => void;
@@ -52,7 +46,6 @@ class WebSocketClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private shouldReconnect = false;
 
-  // Conectar a la sala de una ronda
   async connect(roundId: string): Promise<void> {
     this.disconnect();
     this.roundId = roundId;
@@ -71,14 +64,12 @@ class WebSocketClient {
     this.roundId = null;
   }
 
-  // Suscribirse a un tipo de evento
   on<T extends WsEventType>(event: T, listener: Listener<T>): () => void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
     this.listeners.get(event)!.add(listener as Listener<WsEventType>);
 
-    // Devuelve función de cleanup
     return () => {
       this.listeners.get(event)?.delete(listener as Listener<WsEventType>);
     };

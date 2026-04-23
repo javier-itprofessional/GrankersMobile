@@ -23,16 +23,12 @@ export type ActionType =
   | 'MEDIA_ATTACHED'
   | 'SIGNATURE_ADDED';
 
-// ─── Payloads tipados ─────────────────────────────────────────────────────────
+// ─── Payloads tipados (spec v2.4.0) ──────────────────────────────────────────
 
 export interface HoleSavedPayload {
   round_id: string;
-  player_id: string;
   hole_number: number;
-  score: number;
-  par: number;
-  handicap: number;
-  strokes_net?: number;
+  scores: { player_id: string; score: number; strokes_net?: number }[];
 }
 
 export interface ScoreAmendedPayload {
@@ -49,7 +45,7 @@ export interface PenaltyAddedPayload {
   player_id: string;
   hole_number: number;
   penalty_strokes: number;
-  rule_reference?: string;  // e.g. "Rule 17.1"
+  reason?: string;
 }
 
 export interface PlayerReadyPayload {
@@ -59,9 +55,15 @@ export interface PlayerReadyPayload {
 
 export interface RoundStartedPayload {
   round_id: string;
-  competition_id?: string;
-  tour_event_id?: string;
   mode: 'competition' | 'free-play';
+  group_code?: string;
+  tour_event_id?: string;
+  course_name?: string;
+  route_name?: string;
+  tee_color?: string;
+  hole_pars?: number[];
+  hole_handicaps?: number[];
+  players?: { player_id: string; first_name: string; last_name: string; handicap?: number; tee_color?: string }[];
 }
 
 export interface RoundFinishedPayload {
@@ -70,7 +72,7 @@ export interface RoundFinishedPayload {
 
 export interface RoundSuspendedPayload {
   round_id: string;
-  reason?: string;          // weather | injury | darkness
+  reason?: string;
 }
 
 export interface RoundResumedPayload {
@@ -79,35 +81,34 @@ export interface RoundResumedPayload {
 
 export interface ConcessionPayload {
   round_id: string;
-  player_id: string;
   hole_number: number;
+  conceding_player_id: string;
+  beneficiary_player_id: string;
 }
 
 export interface HoleResultPayload {
   round_id: string;
   hole_number: number;
-  winner_player_id?: string; // null = halved
+  winner_player_id?: string;
 }
 
 export interface NoteAddedPayload {
   round_id: string;
-  player_id?: string;
   hole_number?: number;
   text: string;
 }
 
 export interface MediaAttachedPayload {
   round_id: string;
-  player_id?: string;
-  attachment_id: string;    // FK -> media_attachments
-  attachment_type: 'photo' | 'signature' | 'document';
+  hole_number?: number;
+  attachment_id: string;
+  attachment_type: 'photo' | 'video' | 'signature';
 }
 
 export interface SignatureAddedPayload {
   round_id: string;
-  player_id: string;        // jugador que firma
-  signed_for_player_id: string; // jugador cuya tarjeta se firma (marker firma la tarjeta del jugador)
-  attachment_id: string;    // FK -> media_attachments
+  attachment_id: string;
+  signed_by_player_id: string;
 }
 
 export type ActionPayload =

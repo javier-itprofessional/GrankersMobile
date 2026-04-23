@@ -81,9 +81,9 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
 
         const restoredPlayers: Player[] = roundPlayerRecords.map((p) => ({
           id: p.playerExternalId,
-          nombre: p.nombre,
-          apellido: p.apellido,
-          licencia: p.licencia ?? undefined,
+          firstName: p.firstName,
+          lastName: p.lastName,
+          license: p.license ?? undefined,
           handicap: p.handicap ?? undefined,
           isDevice: p.isLocalDevice,
         }));
@@ -220,12 +220,12 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
         await database.get<RoundPlayer>('round_players').create((rp) => {
           rp.roundId = round.id;
           rp.playerExternalId = player.id;
-          rp.nombre = player.nombre;
-          rp.apellido = player.apellido;
-          rp.licencia = player.licencia ?? null;
+          rp.firstName = player.firstName;
+          rp.lastName = player.lastName;
+          rp.license = player.license ?? null;
           rp.handicap = typeof player.handicap === 'number' ? player.handicap : null;
           rp.isLocalDevice = player.isDevice ?? false;
-          rp.estado = 'pendiente';
+          rp.status = 'not_started';
         });
       }
 
@@ -313,10 +313,15 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
       }
     });
 
-    for (const s of savedScores) {
+    // ONE event for the whole group (spec v2.4.0 §2.2)
+    if (savedScores.length > 0) {
       syncEngine.record(
         'HOLE_SAVED',
-        { round_id: activeRoundId, player_id: s.playerId, hole_number: holeNumber, score: s.score, par: s.par, handicap: s.handicap },
+        {
+          round_id: activeRoundId,
+          hole_number: holeNumber,
+          scores: savedScores.map((s) => ({ player_id: s.playerId, score: s.score })),
+        },
         activeRoundId
       ).catch(() => {});
     }

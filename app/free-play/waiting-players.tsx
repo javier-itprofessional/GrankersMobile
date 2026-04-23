@@ -7,8 +7,8 @@ import { wsClient } from '@/services/websocket';
 import { useFreePlay } from '@/providers/FreePlayProvider';
 
 interface PlayerStatus {
-  nombre: string;
-  apellido: string;
+  firstName: string;
+  lastName: string;
   deviceId?: string;
 }
 
@@ -42,8 +42,8 @@ export default function WaitingPlayersScreen() {
   useEffect(() => {
     if (freePlayPlayers.length > 0) {
       const list: PlayerStatus[] = freePlayPlayers.map((p) => ({
-        nombre: p.nombre,
-        apellido: p.apellido,
+        firstName: p.firstName,
+        lastName: p.lastName,
         deviceId: p.isDevice ? 'local' : undefined,
       }));
       setPlayersStatus(list);
@@ -59,7 +59,7 @@ export default function WaitingPlayersScreen() {
       setPlayersStatus((prev) => {
         const updated = prev.map((p, idx) => {
           if (payload.player_id === String(idx)) {
-            return { ...p, deviceId: payload.status === 'conectado' ? payload.player_id : undefined };
+            return { ...p, deviceId: payload.status === 'conectado' ? payload.player_uuid : undefined };
           }
           return p;
         });
@@ -151,7 +151,7 @@ export default function WaitingPlayersScreen() {
                   styles.playerName,
                   (isConnected || isOffline) && styles.playerNameConnected
                 ]}>
-                  {player.nombre} {player.apellido}
+                  {player.firstName} {player.lastName}
                 </Text>
                 
                 {!isConnected && (

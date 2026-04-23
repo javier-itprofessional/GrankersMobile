@@ -12,8 +12,8 @@ export default class Hole extends Model {
   @field('hole_number') holeNumber!: number;       // 1-18
   @field('par') par!: number;                      // 3, 4 o 5
   @field('handicap') handicap!: number;            // índice slope 1-18
-  @field('distancia_metros') distanciaMetros!: number | null;
-  @field('distancia_yards') distanciaYards!: number | null;
+  @field('distance_meters') distanceMeters!: number | null;
+  @field('distance_yards') distanceYards!: number | null;
 
   @relation('routes', 'route_id') route!: Route;
 }

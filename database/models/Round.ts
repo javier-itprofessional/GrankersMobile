@@ -24,10 +24,10 @@ export default class Round extends Model {
   @field('created_at') createdAt!: number;
 
   // Competition fields
-  @text('codigo_grupo') codigoGrupo!: string | null;
-  @text('nombre_competicion') nombreCompeticion!: string | null;
-  @text('nombre_prueba') nombrePrueba!: string | null;
-  @text('fecha') fecha!: string | null;
+  @text('group_code') groupCode!: string | null;
+  @text('competition_name') competitionName!: string | null;
+  @text('event_name') eventName!: string | null;
+  @text('date') date!: string | null;
   @text('tour_event_id') tourEventId!: string | null;  // FK -> tour_events.external_id
 
   // Free-play fields

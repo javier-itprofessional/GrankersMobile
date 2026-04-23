@@ -23,10 +23,10 @@ export default function ScorecardScreen() {
   const isFreePlayMode = gameStarted;
   
   const competition = isCompetitionMode ? competitionData : (isFreePlayMode ? {
-    codigo_grupo: '',
-    nombre_competicion: 'Partida Libre',
-    nombre_prueba: 'Partida Libre',
-    jugadores: players,
+    groupCode: '',
+    competitionName: 'Partida Libre',
+    eventName: 'Partida Libre',
+    players,
   } : null);
   
   const playerScoresMap = isCompetitionMode ? compScoresMap : freeScoresMap;
@@ -35,7 +35,7 @@ export default function ScorecardScreen() {
   const updateScore = isCompetitionMode ? compUpdateScore : freeUpdateScore;
   const saveHole = isCompetitionMode ? compSaveHole : freeSaveHole;
 
-  const player = competition?.jugadores.find((p) => p.id === params.playerId);
+  const player = competition?.players.find((p) => p.id === params.playerId);
   const scores = playerScoresMap.get(params.playerId);
   const selectedHole = params.holeNumber ? parseInt(params.holeNumber) : currentHole;
   
@@ -261,7 +261,7 @@ export default function ScorecardScreen() {
         </View>
 
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.holeViewContent}>
-          {competition.jugadores.map((p) => {
+          {competition.players.map((p) => {
             const playerScores = playerScoresMap.get(p.id);
             if (!playerScores) return null;
             
@@ -273,7 +273,7 @@ export default function ScorecardScreen() {
                 <View style={styles.playerScoreHeader}>
                   <View style={styles.playerScoreInfo}>
                     <Text style={styles.playerScoreName}>
-                      {p.nombre} {p.apellido}
+                      {p.firstName} {p.lastName}
                       {isDevicePlayer && ' (Tú)'}
                     </Text>
                     <View style={styles.playerScoreStats}>
@@ -387,9 +387,9 @@ export default function ScorecardScreen() {
       >
         <View style={[styles.header, isLandscape && styles.headerLandscape]}>
           <Text style={[styles.playerName, isLandscape && styles.playerNameLandscape]}>
-            {player.nombre} {player.apellido}
+            {player.firstName} {player.lastName}
           </Text>
-          <Text style={[styles.competitionName, isLandscape && styles.competitionNameLandscape]}>{competition.nombre_prueba}</Text>
+          <Text style={[styles.competitionName, isLandscape && styles.competitionNameLandscape]}>{competition.eventName}</Text>
         </View>
 
         <View style={[styles.summary, isLandscape && styles.summaryLandscape]}>

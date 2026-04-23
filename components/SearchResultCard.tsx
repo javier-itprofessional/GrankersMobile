@@ -2,18 +2,18 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Colors from '../constants/colors';
 
 interface SearchResultCardProps {
-  nombre: string;
-  apellido: string;
-  licencia: string;
+  firstName: string;
+  lastName: string;
+  license: string;
   handicap?: number;
   onPress: () => void;
   testID?: string;
 }
 
 export default function SearchResultCard({
-  nombre,
-  apellido,
-  licencia,
+  firstName,
+  lastName,
+  license,
   handicap,
   onPress,
   testID,
@@ -26,9 +26,9 @@ export default function SearchResultCard({
     >
       <View style={styles.info}>
         <Text style={styles.name}>
-          {nombre} {apellido}
+          {firstName} {lastName}
         </Text>
-        <Text style={styles.license}>Licencia: {licencia}</Text>
+        <Text style={styles.license}>Licencia: {license}</Text>
         {handicap !== undefined && (
           <Text style={styles.handicap}>Handicap: {handicap}</Text>
         )}

@@ -63,7 +63,7 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
   const [activeRoundId, setActiveRoundId] = useState<string | null>(null);
   const [wsLeaderboard, setWsLeaderboard] = useState<LeaderboardEntry[] | null>(null);
 
-  // ─── Carga inicial ──────────────────────────────────────────────────────────
+  // ─── Initial load ───────────────────────────────────────────────────────────
 
   useEffect(() => {
     const load = async () => {
@@ -85,17 +85,17 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
           .fetch();
 
         const comp: Competition = {
-          codigo_grupo: round.codigoGrupo ?? '',
-          nombre_competicion: round.nombreCompeticion ?? '',
-          nombre_prueba: round.nombrePrueba ?? '',
-          campo: round.courseName,
-          recorrido: round.routeName,
-          fecha: round.fecha ?? undefined,
-          jugadores: players.map((p) => ({
+          groupCode: round.groupCode ?? '',
+          competitionName: round.competitionName ?? '',
+          eventName: round.eventName ?? '',
+          courseName: round.courseName,
+          routeName: round.routeName,
+          date: round.date ?? undefined,
+          players: players.map((p) => ({
             id: p.playerExternalId,
-            nombre: p.nombre,
-            apellido: p.apellido,
-            licencia: p.licencia ?? undefined,
+            firstName: p.firstName,
+            lastName: p.lastName,
+            license: p.license ?? undefined,
             handicap: p.handicap ?? undefined,
           })),
         };
@@ -113,7 +113,7 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
           .fetch();
 
         const scoresMap = new Map<string, PlayerScores>();
-        for (const player of comp.jugadores) {
+        for (const player of comp.players) {
           const playerHoles = holeScores
             .filter((h) => h.playerExternalId === player.id)
             .sort((a, b) => a.holeNumber - b.holeNumber);
@@ -129,7 +129,6 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
         }
         setPlayerScoresMap(scoresMap);
 
-        // Conectar WebSocket para esta ronda
         wsClient.connect(round.id);
       }
 
@@ -154,7 +153,7 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
     };
   }, []);
 
-  // ─── Suscripción WebSocket: leaderboard en tiempo real ──────────────────────
+  // ─── WebSocket: real-time leaderboard ───────────────────────────────────────
 
   useEffect(() => {
     if (!activeRoundId) return;
@@ -165,28 +164,10 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
       }
     });
 
-    // Actualizar score individual confirmado por el backend
-    const unsubScore = wsClient.on('score_confirmed', (payload) => {
-      if (payload.round_id !== activeRoundId) return;
-      setPlayerScoresMap((prev) => {
-        const next = new Map(prev);
-        const ps = next.get(payload.player_id);
-        if (ps) {
-          next.set(payload.player_id, {
-            ...ps,
-            scores: ps.scores.map((s) =>
-              s.holeNumber === payload.hole_number ? { ...s, score: payload.score, saved: true } : s
-            ),
-          });
-        }
-        return next;
-      });
-    });
-
-    return () => { unsub(); unsubScore(); };
+    return unsub;
   }, [activeRoundId]);
 
-  // ─── Persistir currentHole y currentScreen ──────────────────────────────────
+  // ─── Persist currentHole and currentScreen ──────────────────────────────────
 
   useEffect(() => {
     if (!activeRoundId || !isLoaded) return;
@@ -199,13 +180,13 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
     });
   }, [currentHole, currentScreen, activeRoundId, isLoaded]);
 
-  // ─── Acciones ───────────────────────────────────────────────────────────────
+  // ─── Actions ────────────────────────────────────────────────────────────────
 
   const startCompetition = useCallback(async (comp: Competition) => {
     let pars = generateHolePars();
     let hcps = new Array(18).fill(0);
-    if (comp.campo?.trim() && comp.recorrido?.trim()) {
-      const courseData = await getCourseRouteData(comp.campo.trim(), comp.recorrido.trim()).catch(() => null);
+    if (comp.courseName?.trim() && comp.routeName?.trim()) {
+      const courseData = await getCourseRouteData(comp.courseName.trim(), comp.routeName.trim()).catch(() => null);
       if (courseData) {
         pars = courseData.holes.map((h) => h.par);
         hcps = courseData.holes.map((h) => h.handicap);
@@ -222,32 +203,32 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
 
       const round = await database.get<Round>('rounds').create((r) => {
         r.mode = 'competition';
-        r.courseName = comp.campo ?? '';
-        r.routeName = comp.recorrido ?? '';
+        r.courseName = comp.courseName ?? '';
+        r.routeName = comp.routeName ?? '';
         r.currentHole = 1;
         r.status = 'in_progress';
         r.scoringMode = 'all';
         r.visiblePlayerIds = '[]';
         r.holePars = JSON.stringify(pars);
         r.holeHandicaps = JSON.stringify(hcps);
-        r.codigoGrupo = comp.codigo_grupo;
-        r.nombreCompeticion = comp.nombre_competicion;
-        r.nombrePrueba = comp.nombre_prueba;
-        r.fecha = comp.fecha ?? null;
+        r.groupCode = comp.groupCode;
+        r.competitionName = comp.competitionName;
+        r.eventName = comp.eventName;
+        r.date = comp.date ?? null;
         r.createdAt = Date.now();
       });
       roundId = round.id;
 
-      for (const player of comp.jugadores) {
+      for (const player of comp.players) {
         await database.get<RoundPlayer>('round_players').create((rp) => {
           rp.roundId = round.id;
           rp.playerExternalId = player.id;
-          rp.nombre = player.nombre;
-          rp.apellido = player.apellido;
-          rp.licencia = player.licencia ?? null;
+          rp.firstName = player.firstName;
+          rp.lastName = player.lastName;
+          rp.license = player.license ?? null;
           rp.handicap = player.handicap ?? null;
           rp.isLocalDevice = false;
-          rp.estado = 'pendiente';
+          rp.status = 'not_started';
         });
         for (let i = 1; i <= 18; i++) {
           await database.get<HoleScoreModel>('hole_scores').create((hs) => {
@@ -264,7 +245,7 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
     });
 
     const scoresMap = new Map<string, PlayerScores>();
-    comp.jugadores.forEach((player) => {
+    comp.players.forEach((player) => {
       scoresMap.set(player.id, {
         playerId: player.id,
         scores: Array.from({ length: 18 }, (_, i) => ({
@@ -285,10 +266,8 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
     setVisiblePlayerIds([]);
     setWsLeaderboard(null);
 
-    // Registrar acción + conectar WebSocket
     await syncEngine.record('ROUND_STARTED', {
       round_id: roundId,
-      competition_id: comp.codigo_grupo,
       mode: 'competition',
     }, roundId);
     wsClient.connect(roundId);
@@ -311,11 +290,10 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
   const saveHole = useCallback(async (holeNumber: number): Promise<void> => {
     if (!competition || !activeRoundId) return;
 
-    const visiblePlayers = competition.jugadores.filter(
+    const visiblePlayers = competition.players.filter(
       (p) => scoringMode === 'all' || visiblePlayerIds.includes(p.id)
     );
 
-    // Persistir en DB local
     await database.write(async () => {
       const dbScores = await database
         .get<HoleScoreModel>('hole_scores')
@@ -344,18 +322,16 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
       return next;
     });
 
-    // Registrar una acción por cada jugador visible
-    for (const player of visiblePlayers) {
-      const holeScore = playerScoresMap.get(player.id)?.scores.find((s) => s.holeNumber === holeNumber);
-      if (!holeScore) continue;
-      await syncEngine.record('HOLE_SAVED', {
-        round_id: activeRoundId,
-        player_id: player.id,
-        hole_number: holeNumber,
-        score: holeScore.score,
-        par: holeScore.par,
-        handicap: holeScore.par,   // el par del hoyo (handicap real está en holeHandicaps)
-      }, activeRoundId);
+    // ONE event for the whole group (spec v2.4.0 §2.2)
+    const scores = visiblePlayers
+      .map((player) => {
+        const holeScore = playerScoresMap.get(player.id)?.scores.find((s) => s.holeNumber === holeNumber);
+        return holeScore ? { player_id: player.id, score: holeScore.score } : null;
+      })
+      .filter((s): s is { player_id: string; score: number } => s !== null);
+
+    if (scores.length > 0) {
+      await syncEngine.record('HOLE_SAVED', { round_id: activeRoundId, hole_number: holeNumber, scores }, activeRoundId);
     }
   }, [competition, activeRoundId, playerScoresMap, scoringMode, visiblePlayerIds]);
 
@@ -433,24 +409,23 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
   // ─── Leaderboard (WebSocket > local) ────────────────────────────────────────
 
   const leaderboard = useMemo(() => {
-    const players = competition?.jugadores ?? [];
+    const players = competition?.players ?? [];
     if (!players.length) return [];
 
-    // Si el backend ya envió el leaderboard por WS, usarlo directamente
     if (wsLeaderboard) {
       return wsLeaderboard.map((entry) => {
         const player = players.find((p) => p.id === entry.player_id);
         return {
-          player: player ?? { id: entry.player_id, nombre: entry.nombre, apellido: entry.apellido },
+          player: player ?? { id: entry.player_id, firstName: entry.first_name, lastName: entry.last_name },
           totalScore: entry.total_score,
-          totalPar: entry.total_par,
+          totalPar: 0,
           score: entry.vs_par,
           holesCompleted: entry.holes_completed,
+          position: entry.position,
         };
       });
     }
 
-    // Fallback: calcular localmente
     return players
       .map((player) => {
         const ps = playerScoresMap.get(player.id);
