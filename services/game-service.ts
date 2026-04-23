@@ -280,16 +280,33 @@ export async function linkDeviceToPlayer(
   );
 }
 
+interface WireActivePlayer {
+  nombre?: string;
+  firstName?: string;
+  apellido?: string;
+  lastName?: string;
+  handicap?: string | number;
+  licencia?: string;
+  license?: string;
+}
+
 export async function getActiveGamePlayers(
   courseName: string,
   routeName: string,
   gameName: string,
   groupName: string
-): Promise<any> {
+): Promise<{ id: string; firstName: string; lastName: string; handicap: string; license?: string }[] | null> {
   try {
-    return await apiRequest<any>(
+    const wire = await apiRequest<Record<string, WireActivePlayer>>(
       `/api/v1/free-play/games/${encodeURIComponent(gameName)}/groups/${encodeURIComponent(groupName)}/players/?course=${encodeURIComponent(courseName)}&route=${encodeURIComponent(routeName)}`
     );
+    return Object.entries(wire).map(([key, value]) => ({
+      id: key,
+      firstName: value.nombre || value.firstName || '',
+      lastName: value.apellido || value.lastName || '',
+      handicap: String(value.handicap ?? '0'),
+      license: value.licencia || value.license,
+    }));
   } catch {
     return null;
   }
@@ -301,7 +318,7 @@ export async function listFreePlayGames(
 ): Promise<{ gameName: string; groups: string[] }[]> {
   try {
     return await apiRequest<{ gameName: string; groups: string[] }[]>(
-      `/api/v1/free-play/games/?course=${encodeURIComponent(courseName)}&route=${encodeURIComponent(routeName)}`
+      `/api/v1/free-play/games/?course=${encodeURIComponent(courseName)}`
     );
   } catch {
     return [];

@@ -184,25 +184,27 @@ apiRequest<T>(path: string, options?: RequestInit): Promise<T>
 [
   {
     "id": "string",
-    "nombre": "string",
-    "ciudad": "string",
-    "pais": "string",
+    "name": "string",
+    "city": "string",
+    "country": "string",
     "routes": [
       {
         "id": "string",
-        "nombre": "string",
-        "num_hoyos": 18,
+        "name": "string",
+        "num_holes": 18,
         "par_total": 72,
         "slope": 113,
         "course_rating": 71.2,
         "holes": [
-          { "hole_number": 1, "par": 4, "handicap": 7, "distancia_metros": 380 }
+          { "number": 1, "par": 4, "handicap": 7, "distance": 380 }
         ]
       }
     ]
   }
 ]
 ```
+
+> La capa de transformación en `services/course-service.ts` convierte los campos del backend (`number`, `distance`) a los tipos internos (`hole_number`, `distance_meters`).
 
 > Los campos se cachean localmente durante **24 horas** en WatermelonDB (`courses`, `routes`, `holes`).
 
@@ -214,7 +216,7 @@ apiRequest<T>(path: string, options?: RequestInit): Promise<T>
 | GET | `/api/v1/competitions/active/?device_id={id}` | Competición activa del dispositivo |
 | GET | `/api/v1/competitions/{codigo_grupo}/players/{playerId}/scores/` | Puntuaciones del jugador |
 | POST | `/api/v1/competitions/{codigo_grupo}/players/{playerId}/link-device/` | Vincular dispositivo al jugador |
-| PATCH | `/api/v1/competitions/{codigo_grupo}/players/{playerId}/status/` | Actualizar estado de conexión |
+| PATCH | `/api/v1/competitions/{codigo_grupo}/players/{playerId}/status/` | Actualizar estado de conexión (`not_started \| ready \| playing \| finished \| withdrawn`) |
 
 **Response `GET /api/v1/competitions/{codigo_grupo}/`:**
 ```json
@@ -241,7 +243,7 @@ apiRequest<T>(path: string, options?: RequestInit): Promise<T>
 
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
-| GET | `/api/v1/players/search/?licencia=&nombre=&apellido=` | Buscar jugadores por licencia o nombre |
+| GET | `/api/v1/players/search/?licencia=&nombre=&apellido=` | Buscar jugadores por licencia o nombre (params en español, respuesta transformada a inglés internamente) |
 
 ### Sincronización (el más importante)
 
@@ -676,7 +678,17 @@ El leaderboard llega por WebSocket (`leaderboard_updated`). Si el WS no está di
 
 ## Changelog
 
-### 2026-04-23 — Renombrado de identificadores internos a inglés
+### 2026-04-23 — Correcciones de contrato con backend + renombrado a inglés
+
+**Correcciones de contrato (bugs reales)**
+
+- `services/course-service.ts` — Añadidos wire types (`WireHoleData`, `WireRouteData`, `WireCourseData`). El backend devuelve `number`/`distance`; la capa de transformación convierte a `hole_number`/`distance_meters` internamente. `listCourses()` y `fetchAndCache()` actualizados.
+- `services/game-service.ts` — `listFreePlayGames` eliminado parámetro `?route=` (backend no lo soporta). `getActiveGamePlayers` tipado correctamente con `WireActivePlayer`; la transformación de wire se hace en el servicio, no en la pantalla.
+- `app/free-play/waiting-players.tsx` — Handler WS `player_status_changed` corregido: status `'conectado'` → `'ready' | 'playing'`; matching de jugador por `player_id` en vez de índice de array; eliminado `payload.player_uuid` (no existe en spec).
+
+**Renombrado de identificadores internos a inglés** (sin cambios en wire protocol)
+
+
 
 **Cambio interno — no afecta al wire protocol con el backend.**
 

@@ -4,14 +4,40 @@ import { apiRequest } from './api';
 
 const SYNC_TTL_MS = 24 * 60 * 60 * 1000;
 
-// ─── API types ────────────────────────────────────────────────────────────────
+// ─── Wire types (backend shape) ───────────────────────────────────────────────
+
+interface WireHoleData {
+  number: number;
+  par: number;
+  handicap: number;
+  distance?: number;
+}
+
+interface WireRouteData {
+  id: string;
+  name: string;
+  num_holes: number;
+  par_total: number;
+  slope?: number;
+  course_rating?: number;
+  holes: WireHoleData[];
+}
+
+interface WireCourseData {
+  id: string;
+  name: string;
+  city?: string;
+  country?: string;
+  routes: WireRouteData[];
+}
+
+// ─── Internal types ───────────────────────────────────────────────────────────
 
 export interface HoleData {
   hole_number: number;
   par: number;
   handicap: number;
   distance_meters?: number;
-  distance_yards?: number;
 }
 
 export interface RouteData {
@@ -30,6 +56,21 @@ export interface CourseData {
   city?: string;
   country?: string;
   routes: RouteData[];
+}
+
+function transformCourse(wire: WireCourseData): CourseData {
+  return {
+    ...wire,
+    routes: wire.routes.map((r) => ({
+      ...r,
+      holes: r.holes.map((h) => ({
+        hole_number: h.number,
+        par: h.par,
+        handicap: h.handicap,
+        distance_meters: h.distance,
+      })),
+    })),
+  };
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -56,7 +97,8 @@ export async function getHoleHandicaps(courseName: string, routeName: string): P
 }
 
 export async function listCourses(): Promise<CourseData[]> {
-  return apiRequest<CourseData[]>('/api/v1/courses/');
+  const wire = await apiRequest<WireCourseData[]>('/api/v1/courses/');
+  return wire.map(transformCourse);
 }
 
 // ─── Local cache ──────────────────────────────────────────────────────────────
@@ -102,11 +144,11 @@ async function getFromCache(courseName: string, routeName: string): Promise<Rout
 
 async function fetchAndCache(courseName: string, routeName: string): Promise<RouteData | null> {
   try {
-    const results = await apiRequest<CourseData[]>(
+    const wire = await apiRequest<WireCourseData[]>(
       `/api/v1/courses/?name=${encodeURIComponent(courseName)}&route=${encodeURIComponent(routeName)}`
     );
 
-    const course = results[0];
+    const course = wire[0] ? transformCourse(wire[0]) : null;
     if (!course) return null;
 
     const route = course.routes.find((r) => r.name === routeName);
@@ -170,7 +212,6 @@ async function persistCourse(courseData: CourseData, routeData: RouteData): Prom
         h.par = hole.par;
         h.handicap = hole.handicap;
         h.distanceMeters = hole.distance_meters ?? null;
-        h.distanceYards = hole.distance_yards ?? null;
       });
     }
   });

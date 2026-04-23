@@ -7,6 +7,7 @@ import { wsClient } from '@/services/websocket';
 import { useFreePlay } from '@/providers/FreePlayProvider';
 
 interface PlayerStatus {
+  id: string;
   firstName: string;
   lastName: string;
   deviceId?: string;
@@ -42,6 +43,7 @@ export default function WaitingPlayersScreen() {
   useEffect(() => {
     if (freePlayPlayers.length > 0) {
       const list: PlayerStatus[] = freePlayPlayers.map((p) => ({
+        id: p.id,
         firstName: p.firstName,
         lastName: p.lastName,
         deviceId: p.isDevice ? 'local' : undefined,
@@ -57,11 +59,10 @@ export default function WaitingPlayersScreen() {
 
     const unsubscribe = wsClient.on('player_status_changed', (payload) => {
       setPlayersStatus((prev) => {
-        const updated = prev.map((p, idx) => {
-          if (payload.player_id === String(idx)) {
-            return { ...p, deviceId: payload.status === 'conectado' ? payload.player_uuid : undefined };
-          }
-          return p;
+        const connected = payload.status === 'ready' || payload.status === 'playing';
+        const updated = prev.map((p) => {
+          if (p.id !== payload.player_id) return p;
+          return { ...p, deviceId: connected ? payload.player_id : undefined };
         });
         setConnectedCount(updated.filter((p) => p.deviceId).length);
         return updated;

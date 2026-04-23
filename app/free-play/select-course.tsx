@@ -138,13 +138,7 @@ export default function SelectCourseScreen() {
       const gamePlayers = await getActiveGamePlayers(selectedCourse, selectedRoute, selectedGame, groupName);
 
       if (gamePlayers) {
-        const playersArray = Object.entries(gamePlayers).map(([key, value]: [string, any]) => ({
-          id: key,
-          firstName: value.nombre || value.firstName || '',
-          lastName: value.apellido || value.lastName || '',
-          handicap: value.handicap || '0',
-          license: value.licencia || value.license,
-        }));
+        const playersArray = gamePlayers;
 
         router.push({
           pathname: '/free-play/select-device-player',
