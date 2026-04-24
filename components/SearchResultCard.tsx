@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import Colors from '../constants/colors';
 
 interface SearchResultCardProps {
@@ -6,6 +6,7 @@ interface SearchResultCardProps {
   lastName: string;
   license: string;
   handicap?: number;
+  avatarUrl?: string | null;
   onPress: () => void;
   testID?: string;
 }
@@ -15,6 +16,7 @@ export default function SearchResultCard({
   lastName,
   license,
   handicap,
+  avatarUrl,
   onPress,
   testID,
 }: SearchResultCardProps) {
@@ -27,7 +29,11 @@ export default function SearchResultCard({
       testID={testID}
     >
       <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{initials}</Text>
+        {avatarUrl ? (
+          <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+        ) : (
+          <Text style={styles.avatarText}>{initials}</Text>
+        )}
       </View>
       <View style={styles.info}>
         <Text style={styles.name}>
@@ -69,6 +75,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700' as const,
     color: Colors.golf.primary,
+  },
+  avatarImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
   info: {
     flex: 1,

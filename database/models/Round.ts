@@ -35,6 +35,9 @@ export default class Round extends Model {
   @text('group_name') groupName!: string | null;
   @text('password') password!: string | null;
 
+  // Backend session UUID — used as WS channel key
+  @text('session_uuid') sessionUuid!: string | null;
+
   @children('round_players') roundPlayers!: RoundPlayer[];
   @children('hole_scores') holeScores!: HoleScore[];
 

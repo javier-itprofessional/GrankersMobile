@@ -213,6 +213,7 @@ export default function SearchLicenseScreen() {
                 lastName={player.lastName}
                 license={player.license}
                 handicap={player.handicap}
+                avatarUrl={player.avatarUrl}
                 onPress={() => handleSelectPlayer(player)}
                 testID={`player-result-${index}`}
               />

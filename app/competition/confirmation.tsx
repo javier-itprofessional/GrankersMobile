@@ -20,6 +20,7 @@ export default function ConfirmationScreen() {
       eventName: competition.event_name,
       courseName: competition.course_name,
       routeName: competition.route_name,
+      sessionUuid: competition.session_uuid,
       players: competition.players.map((p) => ({
         id: p.id, firstName: p.first_name, lastName: p.last_name,
         license: p.license, handicap: p.handicap,

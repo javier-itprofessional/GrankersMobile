@@ -4,6 +4,7 @@ import { Q } from '@nozbe/watermelondb';
 import type { Player, PlayerScores, HoleScore } from '../types/game';
 import { getCourseRouteData } from '@/services/course-service';
 import { syncEngine } from '@/services/sync-engine';
+import { wsClient } from '@/services/websocket';
 import { database, Round, RoundPlayer, HoleScore as HoleScoreModel } from '@/database';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -54,11 +55,14 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
   const [currentScreen, setCurrentScreen] = useState<string>('/game/scoring');
   const [activeRoundId, setActiveRoundId] = useState<string | null>(null);
 
-  // ─── Lifecycle: sync engine ────────────────────────────────────────────────
+  // ─── Lifecycle: sync engine + websocket ───────────────────────────────────
 
   useEffect(() => {
     syncEngine.start();
-    return () => { syncEngine.stop(); };
+    return () => {
+      syncEngine.stop();
+      wsClient.disconnect();
+    };
   }, []);
 
   // ─── Carga inicial desde WatermelonDB ───────────────────────────────────────
@@ -127,6 +131,8 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
         setCurrentScreen(round.currentScreen ?? '/game/scoring');
         setPlayerScoresMap(scoresMap);
         setGameStarted(true);
+
+        wsClient.connect(round.sessionUuid ?? round.id);
       }
 
       setIsLoaded(true);
@@ -171,7 +177,7 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
     setDevicePlayerId(playerId);
   }, []);
 
-  const startFreePlay = useCallback(async (playersList: Player[]) => {
+  const startFreePlay = useCallback(async (playersList: Player[], sessionUuid?: string) => {
     // Obtener pars y handicaps reales del campo (o fallback aleatorio)
     let pars = generateHolePars();
     let hcps = holeHandicaps;
@@ -211,6 +217,7 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
         r.holeHandicaps = JSON.stringify(hcps);
         r.gameName = gameName;
         r.groupName = groupName;
+        r.sessionUuid = sessionUuid ?? null;
         r.currentScreen = '/game/scoring';
         r.createdAt = Date.now();
       });
@@ -267,6 +274,7 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
     setActiveRoundId(roundId);
 
     syncEngine.record('ROUND_STARTED', { round_id: roundId, mode: 'free-play' }, roundId).catch(() => {});
+    wsClient.connect(sessionUuid ?? roundId);
   }, [courseName, routeName, gameName, groupName, holeHandicaps]);
 
   const updateScore = useCallback((playerId: string, holeNumber: number, newScore: number) => {

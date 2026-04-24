@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export default appSchema({
-  version: 5,
+  version: 6,
   tables: [
     // ─── Rounds ───────────────────────────────────────────────────────────────
     tableSchema({
@@ -28,6 +28,7 @@ export default appSchema({
         { name: 'game_name', type: 'string', isOptional: true },
         { name: 'group_name', type: 'string', isOptional: true },
         { name: 'password', type: 'string', isOptional: true },
+        { name: 'session_uuid', type: 'string', isOptional: true },
       ],
     }),
     tableSchema({
@@ -112,6 +113,9 @@ export default appSchema({
         { name: 'par_total', type: 'number' },
         { name: 'slope', type: 'number', isOptional: true },
         { name: 'course_rating', type: 'number', isOptional: true },
+        { name: 'tee_color', type: 'string', isOptional: true },
+        { name: 'gender', type: 'string', isOptional: true },
+        { name: 'total_distance', type: 'number', isOptional: true },
         { name: 'synced_at', type: 'number' },
       ],
     }),

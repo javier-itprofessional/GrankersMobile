@@ -4,6 +4,26 @@ import { schemaMigrations, addColumns, createTable, unsafeExecuteSql } from '@no
 
 export default schemaMigrations({
   migrations: [
+    // ─── v6: session_uuid on rounds; tee_color/gender/total_distance on routes ─
+    {
+      toVersion: 6,
+      steps: [
+        addColumns({
+          table: 'rounds',
+          columns: [
+            { name: 'session_uuid', type: 'string', isOptional: true },
+          ],
+        }),
+        addColumns({
+          table: 'routes',
+          columns: [
+            { name: 'tee_color', type: 'string', isOptional: true },
+            { name: 'gender', type: 'string', isOptional: true },
+            { name: 'total_distance', type: 'number', isOptional: true },
+          ],
+        }),
+      ],
+    },
     // ─── v5: rename all Spanish column names to English ───────────────────────
     {
       toVersion: 5,

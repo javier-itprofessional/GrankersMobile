@@ -8,6 +8,7 @@ export default function SelectDevicePlayerScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
     players?: string;
+    sessionUuid?: string;
     courseName?: string;
     routeName?: string;
     gameName?: string;
@@ -26,7 +27,7 @@ export default function SelectDevicePlayerScreen() {
       isDevice: p.id === playerId,
     }));
 
-    startFreePlay(playersWithIds);
+    startFreePlay(playersWithIds, params.sessionUuid || undefined);
     setDevicePlayer(playerId);
 
     setTimeout(() => {

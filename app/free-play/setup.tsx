@@ -173,7 +173,6 @@ export default function FreePlaySetupScreen() {
     console.log('[FreePlay] Course:', params.courseName);
     console.log('[FreePlay] Route:', params.routeName);
     console.log('[FreePlay] Game:', params.gameName);
-    console.log('[FreePlay] Group:', params.groupName);
     console.log('[FreePlay] All params:', JSON.stringify(params, null, 2));
     
     if (!params.courseUuid) {
@@ -196,8 +195,9 @@ export default function FreePlaySetupScreen() {
     }));
 
     setIsSaving(true);
+    let sessionUuid: string | undefined;
     try {
-      await createFreePlayGame(
+      const session = await createFreePlayGame(
         params.courseUuid,
         playersData.map((p) => ({
           playerExternalId: p.license ?? undefined,
@@ -205,12 +205,13 @@ export default function FreePlaySetupScreen() {
         })),
         { routeUuid: params.routeUuid || undefined, gameName: params.gameName }
       );
-      console.log('[FreePlay] ✅ Session created successfully');
+      sessionUuid = session.uuid;
+      console.log('[FreePlay] ✅ Session created successfully, uuid:', sessionUuid);
     } catch (error) {
       console.error('[FreePlay] ❌ Error creating session:', error);
       Alert.alert('Error', 'No se pudo crear la partida. Verifica tu conexión a internet.', [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Continuar sin guardar', onPress: () => proceedToNextScreen(playersData) },
+        { text: 'Continuar sin guardar', onPress: () => proceedToNextScreen(playersData, undefined) },
       ]);
       setIsSaving(false);
       return;
@@ -218,14 +219,15 @@ export default function FreePlaySetupScreen() {
       setIsSaving(false);
     }
 
-    proceedToNextScreen(playersData);
+    proceedToNextScreen(playersData, sessionUuid);
   };
   
-  const proceedToNextScreen = (playersData: { id: string; firstName: string; lastName: string; handicap: string; license?: string }[]) => {
+  const proceedToNextScreen = (playersData: { id: string; firstName: string; lastName: string; handicap: string; license?: string }[], sessionUuid: string | undefined) => {
     router.push({
       pathname: '/free-play/select-device-player',
       params: {
         players: JSON.stringify(playersData),
+        sessionUuid: sessionUuid ?? '',
         courseUuid: params.courseUuid,
         routeUuid: params.routeUuid,
         courseName: params.courseName,

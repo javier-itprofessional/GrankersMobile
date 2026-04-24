@@ -20,6 +20,9 @@ interface WireRouteData {
   par_total: number;
   slope?: number;
   course_rating?: number;
+  tee_color?: string;
+  gender?: string;
+  total_distance?: number;
   holes: WireHoleData[];
 }
 
@@ -47,6 +50,9 @@ export interface RouteData {
   par_total: number;
   slope?: number;
   course_rating?: number;
+  teeColor?: string;
+  gender?: string;
+  totalDistance?: number;
   holes: HoleData[];
 }
 
@@ -63,6 +69,9 @@ function transformCourse(wire: WireCourseData): CourseData {
     ...wire,
     routes: wire.routes.map((r) => ({
       ...r,
+      teeColor: r.tee_color,
+      gender: r.gender,
+      totalDistance: r.total_distance,
       holes: r.holes.map((h) => ({
         hole_number: h.number,
         par: h.par,
@@ -128,6 +137,9 @@ async function getFromCache(courseName: string, routeName: string): Promise<Rout
     par_total: route.parTotal,
     slope: route.slope ?? undefined,
     course_rating: route.courseRating ?? undefined,
+    teeColor: route.teeColor ?? undefined,
+    gender: route.gender ?? undefined,
+    totalDistance: route.totalDistance ?? undefined,
     holes: holes
       .sort((a, b) => a.holeNumber - b.holeNumber)
       .map((h) => ({
@@ -201,6 +213,9 @@ async function persistCourse(courseData: CourseData, routeData: RouteData): Prom
       r.parTotal = routeData.par_total;
       r.slope = routeData.slope ?? null;
       r.courseRating = routeData.course_rating ?? null;
+      r.teeColor = routeData.teeColor ?? null;
+      r.gender = routeData.gender ?? null;
+      r.totalDistance = routeData.totalDistance ?? null;
       r.syncedAt = Date.now();
     });
 

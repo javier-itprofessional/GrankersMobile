@@ -30,6 +30,7 @@ export interface Competition {
   date?: string;
   courseName?: string;
   routeName?: string;
+  sessionUuid?: string;
 }
 
 export interface GameState {
@@ -53,4 +54,5 @@ export interface FirebaseCompetitionData {
   }[];
   course_name?: string;
   route_name?: string;
+  session_uuid?: string;
 }

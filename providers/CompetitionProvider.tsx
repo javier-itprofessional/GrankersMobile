@@ -129,7 +129,7 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
         }
         setPlayerScoresMap(scoresMap);
 
-        wsClient.connect(round.id);
+        wsClient.connect(round.sessionUuid ?? round.id);
       }
 
       const savedDevicePlayerId = await getAppConfig('currentDevicePlayerId');
@@ -215,6 +215,7 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
         r.competitionName = comp.competitionName;
         r.eventName = comp.eventName;
         r.date = comp.date ?? null;
+        r.sessionUuid = comp.sessionUuid ?? null;
         r.createdAt = Date.now();
       });
       roundId = round.id;
@@ -270,7 +271,7 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
       round_id: roundId,
       mode: 'competition',
     }, roundId);
-    wsClient.connect(roundId);
+    wsClient.connect(comp.sessionUuid ?? roundId);
   }, []);
 
   const updateScore = useCallback((playerId: string, holeNumber: number, newScore: number) => {

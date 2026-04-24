@@ -17,6 +17,9 @@ export default class Route extends Model {
   @field('par_total') parTotal!: number;
   @field('slope') slope!: number | null;
   @field('course_rating') courseRating!: number | null;
+  @text('tee_color') teeColor!: string | null;
+  @text('gender') gender!: string | null;
+  @field('total_distance') totalDistance!: number | null;
   @field('synced_at') syncedAt!: number;
 
   @relation('courses', 'course_id') course!: Course;

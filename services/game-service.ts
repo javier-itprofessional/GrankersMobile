@@ -10,6 +10,7 @@ export interface FirebaseCompetitionData {
   players: { id: string; first_name: string; last_name: string; license: string; handicap?: number }[];
   course_name?: string;
   route_name?: string;
+  session_uuid?: string;
 }
 
 export interface LicensePlayer {
@@ -17,6 +18,7 @@ export interface LicensePlayer {
   firstName: string;
   lastName: string;
   handicap?: number;
+  avatarUrl?: string | null;
 }
 
 export interface UpcomingCompetition {
@@ -39,6 +41,7 @@ export interface FoundCompetitionSession {
   players: { id: string; first_name: string; last_name: string; license: string }[];
   courseName?: string;
   routeName?: string;
+  sessionUuid?: string;
 }
 
 export interface PlayerStatus {
@@ -83,6 +86,8 @@ interface WireActiveSession {
   status: string;
   mode: string;
   group_code: string;
+  competition_name?: string;
+  event_name?: string;
   course_name?: string;
   route_name?: string;
   player_id?: string;
@@ -140,14 +145,15 @@ export async function findCompetitionByDeviceId(
     );
     return {
       groupCode: active.group_code,
-      competitionName: comp.competition_name,
-      eventName: comp.event_name,
+      competitionName: active.competition_name ?? comp.competition_name,
+      eventName: active.event_name ?? comp.event_name,
       playerId: active.player_id ?? '',
       playerFirstName: active.player_first_name ?? '',
       playerLastName: active.player_last_name ?? '',
       players: comp.players,
       courseName: comp.course_name,
       routeName: comp.route_name,
+      sessionUuid: comp.session_uuid,
     };
   } catch {
     return null;
@@ -240,6 +246,7 @@ export async function searchPlayerLicenses(
       firstName: w.first_name,
       lastName: w.last_name,
       handicap: w.handicap_index,
+      avatarUrl: w.avatar_url,
     }));
   } catch {
     return [];
