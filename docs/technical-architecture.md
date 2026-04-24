@@ -2,7 +2,7 @@
 
 > Guía de integración para el equipo de backend  
 > React Native (Expo) · WatermelonDB · WebSocket  
-> Última actualización: 2026-04-23 (2) — ver [Changelog](#changelog)
+> Última actualización: 2026-04-24 — ver [Changelog](#changelog)
 
 ---
 
@@ -177,7 +177,7 @@ apiRequest<T>(path: string, options?: RequestInit): Promise<T>
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
 | GET | `/api/v1/courses/` | Listar todos los campos |
-| GET | `/api/v1/courses/?nombre={course}&route={route}` | Campo y recorrido concreto |
+| GET | `/api/v1/courses/?name={course}&route={route}` | Campo y recorrido concreto |
 
 **Response `GET /api/v1/courses/`:**
 ```json
@@ -212,23 +212,47 @@ apiRequest<T>(path: string, options?: RequestInit): Promise<T>
 
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
-| GET | `/api/v1/competitions/{codigo_grupo}/` | Datos de la competición |
-| GET | `/api/v1/competitions/active/?device_id={id}` | Competición activa del dispositivo |
-| GET | `/api/v1/competitions/{codigo_grupo}/players/{playerId}/scores/` | Puntuaciones del jugador |
-| POST | `/api/v1/competitions/{codigo_grupo}/players/{playerId}/link-device/` | Vincular dispositivo al jugador |
-| PATCH | `/api/v1/competitions/{codigo_grupo}/players/{playerId}/status/` | Actualizar estado de conexión (`not_started \| ready \| playing \| finished \| withdrawn`) |
+| GET | `/api/v1/competitions/{group_code}/` | Datos de la competición |
+| GET | `/api/v1/competitions/active/?device_id={id}` | Sesión activa del dispositivo |
+| GET | `/api/v1/competitions/{group_code}/players/{playerId}/scores/` | Puntuaciones del jugador |
+| POST | `/api/v1/competitions/{group_code}/players/{playerId}/link-device/` | Vincular dispositivo al jugador |
+| PATCH | `/api/v1/competitions/{group_code}/players/{playerId}/status/` | Actualizar estado de conexión (`not_started \| ready \| playing \| finished \| withdrawn`) |
 
-**Response `GET /api/v1/competitions/{codigo_grupo}/`:**
+**Response `GET /api/v1/competitions/{group_code}/`:**
 ```json
 {
-  "codigo_grupo": "string",
-  "nombre_competicion": "string",
-  "nombre_prueba": "string",
-  "campo": "string",
-  "recorrido": "string",
-  "jugadores": [
-    { "id": "string", "nombre": "string", "apellido": "string", "licencia": "string" }
+  "group_code": "ABC12",
+  "competition_name": "Spring Open 2026",
+  "event_name": "Round 1",
+  "course_name": "Valderrama Course",
+  "route_name": "10:30 group",
+  "players": [
+    { "id": "<uuid>", "first_name": "Alice", "last_name": "Doe", "license": "123" }
   ]
+}
+```
+
+**Response `GET /api/v1/competitions/active/?device_id={id}`:**
+```json
+{
+  "uuid": "<session-uuid>",
+  "status": "in_progress",
+  "mode": "competition",
+  "group_code": "ABC12",
+  "course_name": "Valderrama Course",
+  "player_id": "<uuid>",
+  "player_first_name": "Alice",
+  "player_last_name": "Doe"
+}
+```
+
+**Response `GET /api/v1/competitions/{group_code}/players/{playerId}/scores/`:**
+```json
+{
+  "session_uuid": "<uuid>",
+  "player_id": "<uuid>",
+  "holes": [{ "hole_number": 1, "par": 4, "strokes": 5, "putts": 2, "penalties": 0 }],
+  "totals": { "strokes": 72, "putts": 28 }
 }
 ```
 
@@ -236,14 +260,49 @@ apiRequest<T>(path: string, options?: RequestInit): Promise<T>
 
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
-| POST | `/api/v1/free-play/games/` | Crear partida libre |
-| GET | `/api/v1/free-play/games/?course={course}&route={route}` | Listar partidas activas |
+| POST | `/api/v1/free-play/games/` | Crear sesión libre (cuerpo flat con `course_uuid` + `players[]`) |
+| GET | `/api/v1/free-play/games/?course={uuid}&route={uuid}` | Listar sesiones activas |
+
+**Body `POST /api/v1/free-play/games/`:**
+```json
+{
+  "course_uuid": "<uuid>",
+  "route_uuid": "<uuid>",
+  "game_name": "Sunday Friendlies",
+  "tee_color": "white",
+  "players": [
+    { "player_external_id": "<uuid>", "handicap": 12.5, "tee_color": "white" }
+  ]
+}
+```
+
+**Response (también el shape de cada elemento en `GET /free-play/games/`):**
+```json
+{
+  "uuid": "<session-uuid>",
+  "mode": "free-play",
+  "status": "in_progress",
+  "course_uuid": "<uuid>",
+  "course_name": "Valderrama Course",
+  "route_uuid": "<uuid>",
+  "route_name": "Black (Male)",
+  "tee_color": "white",
+  "game_name": "Sunday Friendlies",
+  "started_at": "2026-04-23T10:30:00Z",
+  "players": [
+    { "player_external_id": "<uuid>", "first_name": "A", "last_name": "B", "handicap_index": 12.5, "status": "ready" }
+  ],
+  "invited_partners": []
+}
+```
+
+> `players[]` son los participantes activos (auto-añadido = requester). `invited_partners[]` son invitados pendientes de aceptar (display-only, sin endpoint de aceptación en scope actual).
 
 ### Jugadores
 
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
-| GET | `/api/v1/players/search/?licencia=&nombre=&apellido=` | Buscar jugadores por licencia o nombre (params en español, respuesta transformada a inglés internamente) |
+| GET | `/api/v1/players/search/?license=&first_name=&last_name=` | Buscar jugadores por licencia o nombre |
 
 ### Sincronización (el más importante)
 
@@ -677,6 +736,45 @@ El leaderboard llega por WebSocket (`leaderboard_updated`). Si el WS no está di
 ---
 
 ## Changelog
+
+### 2026-04-24 — Hard cutover English wire protocol + Free-play flat model
+
+**`services/game-service.ts` — Wire* Spanish interfaces eliminadas**
+
+- `WirePlayer`, `WireCompetitionData`, `WireActiveCompetition`, `WireLicensePlayer` eliminadas. Backend ya devuelve JSON en inglés.
+- `fetchCompetitionData` — pass-through directo; sin transform.
+- `findCompetitionByDeviceId` — encadena dos llamadas: `/competitions/active/` (→ `group_code`) + `/competitions/{group_code}/` (→ datos completos). `WireActiveSession` cubre campos nuevos (`player_id`, `player_first_name`, `player_last_name`).
+- `getPlayerHoleScores` — tipado correcto: devuelve `{ holes: [{hole_number, par, strokes, ...}], totals }`. Eliminado el fallback de claves `hoyo_${i}`.
+- `searchPlayerLicenses` — params cambiados a inglés: `license`, `first_name`, `last_name`, `group_code`. Respuesta mapeada desde `first_name/last_name/handicap_index`.
+- `subscribeToCompetitionPlayers` — handler WS actualizado: `ready|playing` → `deviceId` marcado; otros status → `deviceId` borrado.
+- `WireLicensePlayer` — refactorizada a inglés (`first_name`, `last_name`, `handicap_index`, `external_id`).
+
+**Free-play — modelo flat (una sesión por partida)**
+
+- `ScoringSession` (nuevo tipo público) + `WireScoringSession` (wire privado).
+- `createFreePlayGame(courseUuid, players[], options?)` — única llamada `POST /free-play/games/` con cuerpo flat; devuelve `ScoringSession`.
+- `listFreePlayGames(courseUuid, routeUuid?)` — re-añadido `?route=<uuid>` (backend Phase 7.1.d); devuelve `ScoringSession[]`.
+- `getActiveGamePlayers(courseUuid, routeUuid?, gameName?)` — reescrito sobre `listFreePlayGames`; filtra por `game_name`.
+- Eliminadas: `addGroupToExistingGame`, `saveFreePlayPlayers`, `linkDeviceToPlayer`, `FreePlayGame` (tipo).
+
+**`app/index.tsx` — scores lookup corregido (§0.d)**
+
+- `hoyo_${i}` / `golpes_jugador` → `holes.find(h => h.hole_number === i)` + `holeData.strokes`. Eliminado TODO(backend-Phase7).
+
+**Free-play screens — adaptadas al modelo flat**
+
+- `select-course.tsx` — usa `CourseData`/`RouteData` (con UUIDs); pasa `courseUuid`+`routeUuid` en params; llama `listFreePlayGames(courseUuid, routeUuid)`. Modal de grupos eliminado (sesiones son flat).
+- `create-game.tsx` — simplificado: solo `gameName` opcional; sin grupo ni contraseña.
+- `setup.tsx` — llama `createFreePlayGame` en lugar de `saveFreePlayPlayers`; pasa `courseUuid`+`routeUuid` por params.
+- `select-device-player.tsx` — eliminada llamada a `linkDeviceToPlayer` y a `getActiveGamePlayers`; player list viene de params; navega directamente a `/game/scoring`.
+
+**Docs — secciones actualizadas**
+
+- Endpoints de competición: claves JSON actualizadas a inglés (`group_code`, `competition_name`, `first_name`, etc.).
+- Player search params: `licencia/nombre/apellido` → `license/first_name/last_name`.
+- Free-play: documentado modelo flat, body del POST, shape de response.
+
+---
 
 ### 2026-04-23 (2) — Correcciones de tipos de adjuntos + arreglos de documento
 

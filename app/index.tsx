@@ -169,13 +169,12 @@ export default function WelcomeScreen() {
       })),
     });
     await setDevicePlayerId(session.playerId);
-    const holeScores = await getPlayerHoleScores(session.groupCode, session.playerId);
+    const scoreData = await getPlayerHoleScores(session.groupCode, session.playerId);
+    const holes = scoreData.holes ?? [];
     let firstUnscoredHole = 1;
     for (let i = 1; i <= 18; i++) {
-      // TODO(backend-Phase7): once /competitions/{cg}/players/{pid}/scores/ returns English keys,
-      // change to: holeScores[`hole_${i}`] and holeData.player_strokes
-      const holeData = holeScores[`hoyo_${i}`];
-      if (!holeData || (holeData.golpes_jugador === undefined && !Object.keys(holeData).some(k => k.startsWith('golpes')))) {
+      const holeData = holes.find((h) => h.hole_number === i);
+      if (!holeData || holeData.strokes === undefined || holeData.strokes === null) {
         firstUnscoredHole = i;
         break;
       }

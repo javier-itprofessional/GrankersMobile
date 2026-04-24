@@ -1,6 +1,5 @@
 import { apiRequest } from './api';
 import { wsClient } from './websocket';
-import type { PlayerStatusEvent } from './websocket';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -50,43 +49,69 @@ export interface PlayerStatus {
   status?: string;
 }
 
-export interface FreePlayGame {
-  id: string;
-  gameName: string;
-  groupName: string;
-  players?: { firstName: string; lastName: string; handicap: string; license?: string; deviceId?: string }[];
+export interface ScoringSession {
+  uuid: string;
+  mode: string;
+  status: string;
+  courseUuid?: string;
+  courseName?: string;
+  routeUuid?: string;
+  routeName?: string;
+  teeColor?: string;
+  gameName?: string;
+  startedAt?: string;
+  players: {
+    playerExternalId: string;
+    firstName: string;
+    lastName: string;
+    handicapIndex?: number;
+    status?: string;
+  }[];
+  invitedPartners?: {
+    playerExternalId: string;
+    firstName: string;
+    lastName: string;
+    handicap?: number;
+    teeColor?: string;
+  }[];
 }
 
-// ─── Wire types (backend returns Spanish JSON) ────────────────────────────────
+// ─── Wire types ───────────────────────────────────────────────────────────────
 
-interface WirePlayer {
-  id: string;
-  nombre: string;
-  apellido: string;
-  licencia: string;
-  handicap?: number;
-}
-
-interface WireCompetitionData {
-  codigo_grupo: string;
-  nombre_competicion: string;
-  nombre_prueba: string;
-  jugadores: WirePlayer[];
-  campo?: string;
-  recorrido?: string;
-}
-
-interface WireActiveCompetition extends WireCompetitionData {
-  player_id: string;
-  player_nombre: string;
-  player_apellido: string;
+interface WireActiveSession {
+  uuid: string;
+  status: string;
+  mode: string;
+  group_code: string;
+  course_name?: string;
+  route_name?: string;
+  player_id?: string;
+  player_first_name?: string;
+  player_last_name?: string;
 }
 
 interface WireLicensePlayer {
-  licencia: string;
-  nombre: string;
-  apellido: string;
-  handicap?: number;
+  external_id?: string;
+  license: string;
+  first_name: string;
+  last_name: string;
+  handicap_index?: number;
+  avatar_url?: string | null;
+}
+
+interface WireScoringSession {
+  uuid: string;
+  mode: string;
+  status: string;
+  course_uuid?: string;
+  course_name?: string;
+  route_uuid?: string;
+  route_name?: string;
+  tee_color?: string;
+  game_name?: string;
+  started_at?: string;
+  players: { player_external_id: string; first_name: string; last_name: string; handicap_index?: number; status?: string }[];
+  invited_partners?: { player_external_id: string; first_name: string; last_name: string; handicap?: number; tee_color?: string }[];
 }
 
 // ─── Competition ──────────────────────────────────────────────────────────────
@@ -95,19 +120,9 @@ export async function fetchCompetitionData(
   groupCode: string
 ): Promise<FirebaseCompetitionData | null> {
   try {
-    const wire = await apiRequest<WireCompetitionData>(
+    return await apiRequest<FirebaseCompetitionData>(
       `/api/v1/competitions/${encodeURIComponent(groupCode)}/`
     );
-    return {
-      group_code: wire.codigo_grupo,
-      competition_name: wire.nombre_competicion,
-      event_name: wire.nombre_prueba,
-      players: wire.jugadores.map((j) => ({
-        id: j.id, first_name: j.nombre, last_name: j.apellido, license: j.licencia, handicap: j.handicap,
-      })),
-      course_name: wire.campo,
-      route_name: wire.recorrido,
-    };
   } catch {
     return null;
   }
@@ -117,21 +132,22 @@ export async function findCompetitionByDeviceId(
   deviceId: string
 ): Promise<FoundCompetitionSession | null> {
   try {
-    const wire = await apiRequest<WireActiveCompetition>(
+    const active = await apiRequest<WireActiveSession>(
       `/api/v1/competitions/active/?device_id=${encodeURIComponent(deviceId)}`
     );
+    const comp = await apiRequest<FirebaseCompetitionData>(
+      `/api/v1/competitions/${encodeURIComponent(active.group_code)}/`
+    );
     return {
-      groupCode: wire.codigo_grupo,
-      competitionName: wire.nombre_competicion,
-      eventName: wire.nombre_prueba,
-      playerId: wire.player_id,
-      playerFirstName: wire.player_nombre,
-      playerLastName: wire.player_apellido,
-      players: wire.jugadores.map((j) => ({
-        id: j.id, first_name: j.nombre, last_name: j.apellido, license: j.licencia,
-      })),
-      courseName: wire.campo,
-      routeName: wire.recorrido,
+      groupCode: active.group_code,
+      competitionName: comp.competition_name,
+      eventName: comp.event_name,
+      playerId: active.player_id ?? '',
+      playerFirstName: active.player_first_name ?? '',
+      playerLastName: active.player_last_name ?? '',
+      players: comp.players,
+      courseName: comp.course_name,
+      routeName: comp.route_name,
     };
   } catch {
     return null;
@@ -141,13 +157,13 @@ export async function findCompetitionByDeviceId(
 export async function getPlayerHoleScores(
   groupCode: string,
   playerId: string
-): Promise<{ [key: string]: any }> {
+): Promise<{ holes: { hole_number: number; par: number; strokes?: number; putts?: number; penalties?: number }[]; totals?: Record<string, number> }> {
   try {
-    return await apiRequest<{ [key: string]: any }>(
+    return await apiRequest<{ holes: { hole_number: number; par: number; strokes?: number; putts?: number; penalties?: number }[]; totals?: Record<string, number> }>(
       `/api/v1/competitions/${encodeURIComponent(groupCode)}/players/${encodeURIComponent(playerId)}/scores/`
     );
   } catch {
-    return {};
+    return { holes: [] };
   }
 }
 
@@ -194,8 +210,10 @@ export function subscribeToCompetitionPlayers(
     const entry = playerMap.get(payload.player_id);
     if (entry) {
       entry.status = payload.status;
-      if (payload.status === 'connected') {
+      if (payload.status === 'ready' || payload.status === 'playing') {
         entry.deviceId = payload.player_id;
+      } else {
+        entry.deviceId = undefined;
       }
     }
     callback(Array.from(playerMap.values()));
@@ -210,14 +228,19 @@ export async function searchPlayerLicenses(
   searchParams: { license?: string; firstName?: string; lastName?: string; groupCode?: string }
 ): Promise<LicensePlayer[]> {
   const params = new URLSearchParams();
-  if (searchParams.license) params.set('licencia', searchParams.license);
-  if (searchParams.firstName) params.set('nombre', searchParams.firstName);
-  if (searchParams.lastName) params.set('apellido', searchParams.lastName);
-  if (searchParams.groupCode) params.set('codigo_grupo', searchParams.groupCode);
+  if (searchParams.license) params.set('license', searchParams.license);
+  if (searchParams.firstName) params.set('first_name', searchParams.firstName);
+  if (searchParams.lastName) params.set('last_name', searchParams.lastName);
+  if (searchParams.groupCode) params.set('group_code', searchParams.groupCode);
 
   try {
     const wire = await apiRequest<WireLicensePlayer[]>(`/api/v1/players/search/?${params.toString()}`);
-    return wire.map((w) => ({ license: w.licencia, firstName: w.nombre, lastName: w.apellido, handicap: w.handicap }));
+    return wire.map((w) => ({
+      license: w.license,
+      firstName: w.first_name,
+      lastName: w.last_name,
+      handicap: w.handicap_index,
+    }));
   } catch {
     return [];
   }
@@ -225,102 +248,88 @@ export async function searchPlayerLicenses(
 
 // ─── Free-play games ──────────────────────────────────────────────────────────
 
+function transformScoringSession(wire: WireScoringSession): ScoringSession {
+  return {
+    uuid: wire.uuid,
+    mode: wire.mode,
+    status: wire.status,
+    courseUuid: wire.course_uuid,
+    courseName: wire.course_name,
+    routeUuid: wire.route_uuid,
+    routeName: wire.route_name,
+    teeColor: wire.tee_color,
+    gameName: wire.game_name,
+    startedAt: wire.started_at,
+    players: wire.players.map((p) => ({
+      playerExternalId: p.player_external_id,
+      firstName: p.first_name,
+      lastName: p.last_name,
+      handicapIndex: p.handicap_index,
+      status: p.status,
+    })),
+    invitedPartners: wire.invited_partners?.map((p) => ({
+      playerExternalId: p.player_external_id,
+      firstName: p.first_name,
+      lastName: p.last_name,
+      handicap: p.handicap,
+      teeColor: p.tee_color,
+    })),
+  };
+}
+
 export async function createFreePlayGame(
-  courseName: string,
-  routeName: string,
-  gameName: string,
-  groupName: string,
-  password?: string
-): Promise<void> {
-  await apiRequest<void>('/api/v1/free-play/games/', {
+  courseUuid: string,
+  players: { playerExternalId?: string; handicap?: number; teeColor?: string }[],
+  options?: { routeUuid?: string; gameName?: string; teeColor?: string }
+): Promise<ScoringSession> {
+  const wire = await apiRequest<WireScoringSession>('/api/v1/free-play/games/', {
     method: 'POST',
-    body: JSON.stringify({ course_name: courseName, route_name: routeName, game_name: gameName, group_name: groupName, password }),
+    body: JSON.stringify({
+      course_uuid: courseUuid,
+      route_uuid: options?.routeUuid,
+      game_name: options?.gameName,
+      tee_color: options?.teeColor,
+      players: players.map((p) => ({
+        player_external_id: p.playerExternalId,
+        handicap: p.handicap,
+        tee_color: p.teeColor,
+      })),
+    }),
   });
-}
-
-export async function addGroupToExistingGame(
-  courseName: string,
-  routeName: string,
-  gameName: string,
-  groupName: string
-): Promise<void> {
-  await apiRequest<void>(`/api/v1/free-play/games/${encodeURIComponent(gameName)}/groups/`, {
-    method: 'POST',
-    body: JSON.stringify({ course_name: courseName, route_name: routeName, group_name: groupName }),
-  });
-}
-
-export async function saveFreePlayPlayers(
-  courseName: string,
-  routeName: string,
-  gameName: string,
-  groupName: string,
-  players: { firstName: string; lastName: string; handicap: string; license?: string }[]
-): Promise<void> {
-  const wirePlayers = players.map((p) => ({
-    nombre: p.firstName, apellido: p.lastName, handicap: p.handicap, licencia: p.license,
-  }));
-  await apiRequest<void>(`/api/v1/free-play/games/${encodeURIComponent(gameName)}/groups/${encodeURIComponent(groupName)}/players/`, {
-    method: 'POST',
-    body: JSON.stringify({ course_name: courseName, route_name: routeName, players: wirePlayers }),
-  });
-}
-
-export async function linkDeviceToPlayer(
-  courseName: string,
-  routeName: string,
-  gameName: string,
-  groupName: string,
-  playerKey: string,
-  deviceId: string
-): Promise<void> {
-  await apiRequest<void>(
-    `/api/v1/free-play/games/${encodeURIComponent(gameName)}/groups/${encodeURIComponent(groupName)}/players/${encodeURIComponent(playerKey)}/link-device/`,
-    { method: 'POST', body: JSON.stringify({ course_name: courseName, route_name: routeName, device_id: deviceId }) }
-  );
-}
-
-interface WireActivePlayer {
-  nombre?: string;
-  firstName?: string;
-  apellido?: string;
-  lastName?: string;
-  handicap?: string | number;
-  licencia?: string;
-  license?: string;
-}
-
-export async function getActiveGamePlayers(
-  courseName: string,
-  routeName: string,
-  gameName: string,
-  groupName: string
-): Promise<{ id: string; firstName: string; lastName: string; handicap: string; license?: string }[] | null> {
-  try {
-    const wire = await apiRequest<Record<string, WireActivePlayer>>(
-      `/api/v1/free-play/games/${encodeURIComponent(gameName)}/groups/${encodeURIComponent(groupName)}/players/?course=${encodeURIComponent(courseName)}&route=${encodeURIComponent(routeName)}`
-    );
-    return Object.entries(wire).map(([key, value]) => ({
-      id: key,
-      firstName: value.nombre || value.firstName || '',
-      lastName: value.apellido || value.lastName || '',
-      handicap: String(value.handicap ?? '0'),
-      license: value.licencia || value.license,
-    }));
-  } catch {
-    return null;
-  }
+  return transformScoringSession(wire);
 }
 
 export async function listFreePlayGames(
-  courseName: string,
-  routeName: string
-): Promise<{ gameName: string; groups: string[] }[]> {
+  courseUuid: string,
+  routeUuid?: string
+): Promise<ScoringSession[]> {
   try {
-    return await apiRequest<{ gameName: string; groups: string[] }[]>(
-      `/api/v1/free-play/games/?course=${encodeURIComponent(courseName)}`
-    );
+    const url = routeUuid
+      ? `/api/v1/free-play/games/?course=${encodeURIComponent(courseUuid)}&route=${encodeURIComponent(routeUuid)}`
+      : `/api/v1/free-play/games/?course=${encodeURIComponent(courseUuid)}`;
+    const wire = await apiRequest<WireScoringSession[]>(url);
+    return wire.map(transformScoringSession);
   } catch {
     return [];
+  }
+}
+
+export async function getActiveGamePlayers(
+  courseUuid: string,
+  routeUuid?: string,
+  gameName?: string
+): Promise<{ id: string; firstName: string; lastName: string; handicap: string }[] | null> {
+  try {
+    const sessions = await listFreePlayGames(courseUuid, routeUuid);
+    const session = gameName ? sessions.find((s) => s.gameName === gameName) : sessions[0];
+    if (!session) return null;
+    return session.players.map((p) => ({
+      id: p.playerExternalId,
+      firstName: p.firstName,
+      lastName: p.lastName,
+      handicap: String(p.handicapIndex ?? 0),
+    }));
+  } catch {
+    return null;
   }
 }

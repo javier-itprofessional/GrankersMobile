@@ -4,13 +4,13 @@ import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { Users } from 'lucide-react-native';
 import Colors from '../../constants/colors';
 import { useFreePlay } from '../../providers/FreePlayProvider';
-import { saveFreePlayPlayers } from '@/services/game-service';
+import { createFreePlayGame } from '@/services/game-service';
 import PlayerCard from '../../components/PlayerCard';
 
 
 export default function FreePlaySetupScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ 
+  const params = useLocalSearchParams<{
     numberOfPlayers?: string;
     selectedPlayerIndex?: string;
     selectedPlayerId?: string;
@@ -19,12 +19,11 @@ export default function FreePlaySetupScreen() {
     selectedPlayerLicense?: string;
     selectedPlayerHandicap?: string;
     existingPlayers?: string;
+    courseUuid?: string;
+    routeUuid?: string;
     courseName?: string;
     routeName?: string;
     gameName?: string;
-    groupName?: string;
-    gameType?: string;
-    gamePassword?: string;
   }>();
   const { resetFreePlay, setCourseInfo } = useFreePlay();
   const [players, setPlayers] = useState<{ id: string; firstName: string; lastName: string; license?: string; handicap?: string }[]>([]);
@@ -148,14 +147,15 @@ export default function FreePlaySetupScreen() {
     
     router.push({
       pathname: '/free-play/search-license',
-      params: { 
+      params: {
         playerIndex,
         numberOfPlayers: params.numberOfPlayers,
         existingPlayers: JSON.stringify(allPlayersData),
+        courseUuid: params.courseUuid,
+        routeUuid: params.routeUuid,
         courseName: params.courseName,
         routeName: params.routeName,
         gameName: params.gameName,
-        groupName: params.groupName,
       },
     });
   };
@@ -176,29 +176,17 @@ export default function FreePlaySetupScreen() {
     console.log('[FreePlay] Group:', params.groupName);
     console.log('[FreePlay] All params:', JSON.stringify(params, null, 2));
     
-    if (!params.courseName || !params.routeName || !params.gameName || !params.groupName) {
-      console.error('[FreePlay] ❌ ERROR: Missing required parameters!');
-      console.error('  courseName:', params.courseName);
-      console.error('  routeName:', params.routeName);
-      console.error('  gameName:', params.gameName);
-      console.error('  groupName:', params.groupName);
-      Alert.alert(
-        'Error',
-        'Faltan datos necesarios. Por favor, vuelve atrás y selecciona de nuevo el campo y recorrido.',
-        [
-          {
-            text: 'OK',
-            onPress: () => router.back(),
-          },
-        ]
-      );
+    if (!params.courseUuid) {
+      Alert.alert('Error', 'Faltan datos del campo. Por favor, vuelve atrás y selecciona de nuevo.', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
       return;
     }
-    
+
     if (params.courseName && params.routeName) {
       setCourseInfo(params.courseName, params.routeName);
     }
-    
+
     const playersData = validPlayers.map(p => ({
       id: p.id,
       firstName: p.firstName,
@@ -206,47 +194,30 @@ export default function FreePlaySetupScreen() {
       handicap: p.handicap || '0',
       license: p.license,
     }));
-    
-    console.log('[FreePlay] Players data to save:', JSON.stringify(playersData, null, 2));
-    
+
     setIsSaving(true);
     try {
-      console.log('[FreePlay] Calling saveFreePlayPlayers with:');
-      console.log('  courseName:', params.courseName);
-      console.log('  routeName:', params.routeName);
-      console.log('  gameName:', params.gameName);
-      console.log('  groupName:', params.groupName);
-      
-      await saveFreePlayPlayers(
-        params.courseName!,
-        params.routeName!,
-        params.gameName!,
-        params.groupName!,
-        playersData
+      await createFreePlayGame(
+        params.courseUuid,
+        playersData.map((p) => ({
+          playerExternalId: p.license ?? undefined,
+          handicap: parseFloat(p.handicap) || 0,
+        })),
+        { routeUuid: params.routeUuid || undefined, gameName: params.gameName }
       );
-      console.log('[FreePlay] ✅ Players saved to Firebase successfully');
+      console.log('[FreePlay] ✅ Session created successfully');
     } catch (error) {
-      console.error('[FreePlay] ❌ Error saving players to Firebase:', error);
-      Alert.alert(
-        'Error',
-        'No se pudieron guardar los jugadores. Verifica tu conexión a internet.',
-        [
-          {
-            text: 'Cancelar',
-            style: 'cancel',
-          },
-          {
-            text: 'Continuar sin guardar',
-            onPress: () => proceedToNextScreen(playersData),
-          },
-        ]
-      );
+      console.error('[FreePlay] ❌ Error creating session:', error);
+      Alert.alert('Error', 'No se pudo crear la partida. Verifica tu conexión a internet.', [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Continuar sin guardar', onPress: () => proceedToNextScreen(playersData) },
+      ]);
       setIsSaving(false);
       return;
     } finally {
       setIsSaving(false);
     }
-    
+
     proceedToNextScreen(playersData);
   };
   
@@ -255,10 +226,11 @@ export default function FreePlaySetupScreen() {
       pathname: '/free-play/select-device-player',
       params: {
         players: JSON.stringify(playersData),
+        courseUuid: params.courseUuid,
+        routeUuid: params.routeUuid,
         courseName: params.courseName,
         routeName: params.routeName,
         gameName: params.gameName,
-        groupName: params.groupName,
       },
     });
   };
