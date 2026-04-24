@@ -12,6 +12,7 @@ export interface FirebaseCompetitionData {
   route_name?: string;
   session_uuid?: string;
   effective_scoring_entry_mode?: string;
+  scoring_entry_mode?: string;  // backend pre-rename alias — remove once §v2-wire.1 ships
 }
 
 export interface LicensePlayer {
@@ -156,7 +157,7 @@ export async function findCompetitionByDeviceId(
       courseName: comp.course_name,
       routeName: comp.route_name,
       sessionUuid: comp.session_uuid,
-      scoringMode: comp.effective_scoring_entry_mode === 'partial' ? 'partial' : 'all',
+      scoringMode: (comp.effective_scoring_entry_mode ?? comp.scoring_entry_mode) === 'partial' ? 'partial' : 'all',
     };
   } catch {
     return null;

@@ -57,4 +57,5 @@ export interface FirebaseCompetitionData {
   route_name?: string;
   session_uuid?: string;
   effective_scoring_entry_mode?: string;
+  scoring_entry_mode?: string;  // backend pre-rename alias — remove once §v2-wire.1 ships
 }

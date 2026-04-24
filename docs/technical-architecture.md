@@ -12,7 +12,7 @@
 |------|-----------|---------|
 | Framework | Expo + React Native | Expo SDK ~53, RN 0.81.5 |
 | Routing | Expo Router (file-based) | ~6.0.23 |
-| Base de datos local | WatermelonDB (SQLite/JSI) — schema v5 | 0.27.0 |
+| Base de datos local | WatermelonDB (SQLite/JSI) — schema v7 | 0.27.0 |
 | Estado global | Zustand | 5.0.2 |
 | Estado servidor | TanStack React Query | 5.83.0 |
 | Peticiones HTTP | Fetch API (wrapper propio) | — |
@@ -50,13 +50,12 @@ GrankersMobile/
 ├── providers/              # React Context — estado global de la app
 │   ├── PlayerAuthProvider.tsx    # Sesión del jugador
 │   ├── CompetitionProvider.tsx   # Estado de competición oficial
-│   ├── FreePlayProvider.tsx      # Estado de partida libre
-│   └── GameProvider.tsx          # (Legacy, en proceso de eliminación)
+│   └── FreePlayProvider.tsx      # Estado de partida libre
 │
 ├── database/               # WatermelonDB
 │   ├── index.ts            # Inicialización de la base de datos
-│   ├── schema.ts           # Schema v5 (14 tablas, columnas en inglés)
-│   ├── migrations.ts       # Migraciones incrementales v1→v5
+│   ├── schema.ts           # Schema v7 (13 tablas, columnas en inglés)
+│   ├── migrations.ts       # Migraciones incrementales v1→v7
 │   └── models/             # Modelos WatermelonDB
 │
 ├── lib/                    # Utilidades compartidas
@@ -444,7 +443,7 @@ El backend **debe ser idempotente por `id` de acción**. La app puede reenviar l
 wss://{EXPO_PUBLIC_WS_URL}/ws/round/{roundId}/?token={accessToken}
 ```
 
-- El `roundId` es el `id` del round en DB (`rounds.id`), tanto en competición como en free-play.
+- El `roundId` es el `uuid` del `ScoringSession` en backend (`rounds.session_uuid` en la DB local), tanto en competición como en free-play.
 - El token JWT se envía como query param (no en header, por limitación de la API de WebSocket nativa).
 - La app conecta al iniciar una ronda y desconecta al finalizarla.
 
@@ -477,11 +476,11 @@ wss://{EXPO_PUBLIC_WS_URL}/ws/round/{roundId}/?token={accessToken}
     "round_id": "string",
     "leaderboard": [
       {
+        "position": 1,
         "player_id": "string",
-        "nombre": "string",
-        "apellido": "string",
+        "first_name": "string",
+        "last_name": "string",
         "total_score": 72,
-        "total_par": 72,
         "vs_par": 0,
         "holes_completed": 18
       }
@@ -539,8 +538,8 @@ La app usa **WatermelonDB 0.27** sobre SQLite con JSI (JavaScript Interface) par
 ```typescript
 // database/index.ts
 const adapter = new SQLiteAdapter({
-  schema,           // schema v5
-  migrations,       // migraciones v1→v5
+  schema,           // schema v7
+  migrations,       // migraciones v1→v7
   dbName: 'grankers',
   jsi: true         // JSI habilitado
 })
@@ -548,24 +547,23 @@ const adapter = new SQLiteAdapter({
 export const database = new Database({ adapter, modelClasses: [...] })
 ```
 
-### Schema version: 5
+### Schema version: 7
 
 | Tabla | Propósito |
 |-------|-----------|
-| `rounds` | Sesiones de juego |
+| `rounds` | Sesiones de juego (`session_uuid` = ScoringSession.uuid del backend) |
 | `round_players` | Participantes de cada ronda |
 | `hole_scores` | Puntuaciones por hoyo |
 | `action_log` | Cola de sincronización (event store) |
 | `tour_events` | Caché de pruebas del tour |
 | `players_cache` | Caché de jugadores |
 | `leaderboard_cache` | Último leaderboard recibido |
-| `media_attachments` | Fotos, docs y firmas |
+| `media_attachments` | Fotos y firmas |
 | `rankings_cache` | Posiciones del ranking |
 | `courses` | Campos de golf |
-| `routes` | Recorridos |
+| `routes` | Recorridos (`tee_color`, `gender`, `total_distance`) |
 | `holes` | Hoyos |
-| `app_config` | Configuración clave-valor |
-| `pending_sync` | (Legacy, en revisión) |
+| `app_config` | Configuración clave-valor (device_id, last_pull_ms, last_bootstrap_ms) |
 
 > Ver [data-model-v4.md](./data-model-v4.md) para el detalle completo de cada tabla.
 
@@ -588,9 +586,10 @@ Gestiona el ciclo de vida de una competición oficial.
 | `holePars` | `number[]` | Par de cada hoyo |
 | `playerScoresMap` | `Map<string, PlayerScores>` | Puntuaciones en memoria |
 | `activeRoundId` | `string \| null` | ID del round en DB |
-| `wsLeaderboard` | `LeaderboardEntry[] \| null` | Leaderboard vía WebSocket |
+| `wsLeaderboard` | `LeaderboardEntry[] \| null` | Leaderboard vía WebSocket o REST fallback |
 | `isOnline` | `boolean` | Estado de conectividad |
-| `scoringMode` | `'all' \| 'partial'` | Quién puntúa |
+| `scoringMode` | `'all' \| 'partial'` | Viene de `effective_scoring_entry_mode` del backend |
+| `isSessionActive` | `boolean` | `false` si el organizador desvinculó, retiró o cerró la ronda |
 
 **Acciones principales:**
 
@@ -656,7 +655,7 @@ Routing basado en el sistema de ficheros. Cada archivo en `app/` es una ruta.
 2. Jugador selecciona su perfil en el dispositivo
    → POST /api/v1/competitions/{codigo_grupo}/players/{playerId}/link-device/
      Body: { device_id: string }
-   → WS conecta a /ws/round/{codigo_grupo}/
+   → WS conecta a /ws/round/{session_uuid}/  ← ScoringSession.uuid del backend
 
 3. Jugador marca "preparado"
    → PATCH /api/v1/competitions/{codigo_grupo}/players/{playerId}/status/
