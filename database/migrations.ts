@@ -4,6 +4,13 @@ import { schemaMigrations, addColumns, createTable, unsafeExecuteSql } from '@no
 
 export default schemaMigrations({
   migrations: [
+    // ─── v7: drop legacy pending_syncs table ──────────────────────────────────
+    {
+      toVersion: 7,
+      steps: [
+        unsafeExecuteSql('DROP TABLE IF EXISTS pending_syncs;'),
+      ],
+    },
     // ─── v6: session_uuid on rounds; tee_color/gender/total_distance on routes ─
     {
       toVersion: 6,

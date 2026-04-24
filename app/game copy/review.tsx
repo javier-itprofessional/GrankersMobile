@@ -1,11 +1,14 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import Colors from '../../constants/colors';
-import { useGame } from '../../providers/GameProvider';
+import { useCompetition } from '../../providers/CompetitionProvider';
+import { useFreePlay } from '../../providers/FreePlayProvider';
 
 export default function ReviewScreen() {
   const router = useRouter();
-  const { goToHole } = useGame();
+  const { goToHole: goToHoleComp, competition } = useCompetition();
+  const { goToHole: goToHoleFP } = useFreePlay();
+  const goToHole = competition ? goToHoleComp : goToHoleFP;
 
   const handleHoleSelect = (holeNumber: number) => {
     goToHole(holeNumber);

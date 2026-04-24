@@ -17,16 +17,16 @@
 | §2.c | `leaderboard_updated` — English payload | ✅ shipped | ✅ done prev | `first_name`, `last_name` en wire |
 | §2.e | WS canal: `ScoringSession.uuid` no `round.id` | ✅ | ✅ **done** | CompetitionProvider + FreePlayProvider usan `session_uuid` |
 | §2.f | Validador regex `X-Device-ID` | ✅ | ✅ uuid v4 pasa | `crypto.randomUUID()` — 36 chars hex+guiones |
-| §2.g | Organizer unlink → `not_started` | ✅ backend emite | ⬜ mobile handler | Alert + stop sync |
-| §2.h | Organizer lifecycle (suspend/resume/force-end) | ✅ backend emite | ⬜ mobile handler | Deshabilitar entrada |
-| §2.i | Organizer withdraw → `withdrawn` | ✅ backend emite | ⬜ mobile handler | Alert + stop sync |
-| §3 | Sync pull incremental `GET /sync/pull/?since=` | ✅ shipped 7.2.b | ⬜ open | sync-engine.ts + watermarks |
+| §2.g | Organizer unlink → `not_started` | ✅ backend emite | ✅ **done** | Alert + isSessionActive=false |
+| §2.h | Organizer lifecycle (round_finished) | ✅ backend emite | ✅ **done** | isSessionActive=false en CompetitionProvider + FreePlayProvider |
+| §2.i | Organizer withdraw → `withdrawn` | ✅ backend emite | ✅ **done** | Alert + isSessionActive=false |
+| §3 | Sync pull incremental `GET /sync/pull/?since=` | ✅ shipped 7.2.b | ✅ **done** | SyncEngine.pull() + AppState + 5 min interval |
 | Phase 7.2.a | Bootstrap leaderboards en /sync/bootstrap/ | ✅ shipped | ✅ done | — |
 | Phase 7.2.c | `avatar_url` real en /players/search/ | ✅ shipped | ✅ **done** | `SearchResultCard` muestra imagen |
-| §4.a | Tabla `pending_syncs` legacy | — | ⬜ open | Deprecar + drop en schema v7 |
-| §4.b | `GameProvider` legacy | — | ⬜ open | Eliminar providers/GameProvider.tsx |
-| §4.c | Logs/toasts con tokens españoles | — | ⬜ open | Grep + sustituir |
-| §4.d | `free-play/waiting-players.tsx` obsoleto | — | ⬜ open | Evaluar eliminación |
+| §4.a | Tabla `pending_syncs` legacy | — | ✅ **done** | Drop en schema v7, modelo y offline-sync limpiados |
+| §4.b | `GameProvider` legacy | — | ✅ **done** | Eliminado; review.tsx usa useCompetition/useFreePlay |
+| §4.c | Logs/toasts con tokens españoles | — | ✅ limpio | Grep confirma 0 hits de wire tokens fuera de migrations |
+| §4.d | `free-play/waiting-players.tsx` obsoleto | — | ✅ **done** | Eliminado |
 
 ---
 

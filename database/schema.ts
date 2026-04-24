@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export default appSchema({
-  version: 6,
+  version: 7,
   tables: [
     // ─── Rounds ───────────────────────────────────────────────────────────────
     tableSchema({
@@ -60,17 +60,6 @@ export default appSchema({
         { name: 'saved_at', type: 'number', isOptional: true },
         { name: 'conflict_score_local', type: 'number', isOptional: true },
         { name: 'conflict_score_marker', type: 'number', isOptional: true },
-      ],
-    }),
-    // ─── Sync queue ───────────────────────────────────────────────────────────
-    tableSchema({
-      name: 'pending_syncs',
-      columns: [
-        { name: 'sync_id', type: 'string' },
-        { name: 'type', type: 'string' },
-        { name: 'payload', type: 'string' },
-        { name: 'timestamp', type: 'number' },
-        { name: 'retries', type: 'number' },
       ],
     }),
     tableSchema({

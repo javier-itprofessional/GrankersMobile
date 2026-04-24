@@ -1,63 +1,6 @@
 import NetInfo from '@react-native-community/netinfo';
 import { Q } from '@nozbe/watermelondb';
-import { database, PendingSync, AppConfig } from '@/database';
-import type { SyncEventType } from '@/database/models/PendingSync';
-
-// ─── Tipos públicos ────────────────────────────────────────────────────────────
-
-export interface PendingSyncItem {
-  id: string;
-  syncId: string;
-  type: SyncEventType;
-  payload: Record<string, unknown>;
-  timestamp: number;
-  retries: number;
-}
-
-// ─── Pending sync ──────────────────────────────────────────────────────────────
-
-export const addPendingSync = async (
-  type: SyncEventType,
-  payload: Record<string, unknown>
-): Promise<void> => {
-  await database.write(async () => {
-    await database.get<PendingSync>('pending_syncs').create((record) => {
-      record.syncId = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      record.type = type;
-      record.payload = JSON.stringify(payload);
-      record.timestamp = Date.now();
-      record.retries = 0;
-    });
-  });
-};
-
-export const getPendingSync = async (): Promise<PendingSyncItem[]> => {
-  const records = await database.get<PendingSync>('pending_syncs').query().fetch();
-  return records.map((r) => ({
-    id: r.id,
-    syncId: r.syncId,
-    type: r.type,
-    payload: r.parsedPayload,
-    timestamp: r.timestamp,
-    retries: r.retries,
-  }));
-};
-
-export const removePendingSync = async (id: string): Promise<void> => {
-  await database.write(async () => {
-    const record = await database.get<PendingSync>('pending_syncs').find(id);
-    await record.destroyPermanently();
-  });
-};
-
-export const incrementSyncRetries = async (id: string): Promise<void> => {
-  await database.write(async () => {
-    const record = await database.get<PendingSync>('pending_syncs').find(id);
-    await record.update((r) => {
-      r.retries = r.retries + 1;
-    });
-  });
-};
+import { database, AppConfig } from '@/database';
 
 // ─── App config (device ID, etc.) ─────────────────────────────────────────────
 

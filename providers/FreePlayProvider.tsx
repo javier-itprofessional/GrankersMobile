@@ -1,5 +1,6 @@
 import createContextHook from '@nkzw/create-context-hook';
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { Alert } from 'react-native';
 import { Q } from '@nozbe/watermelondb';
 import type { Player, PlayerScores, HoleScore } from '../types/game';
 import { getCourseRouteData } from '@/services/course-service';
@@ -54,6 +55,8 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
   const [currentScreen, setCurrentScreen] = useState<string>('/game/scoring');
   const [activeRoundId, setActiveRoundId] = useState<string | null>(null);
+  const [isSessionTerminated, setIsSessionTerminated] = useState(false);
+  const devicePlayerPrevStatusRef = useRef<string | null>(null);
 
   // ─── Lifecycle: sync engine + websocket ───────────────────────────────────
 
@@ -140,6 +143,35 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
 
     load();
   }, []);
+
+  // ─── WebSocket: organizer lifecycle (§2.g, §2.i) ─────────────────────────
+
+  useEffect(() => {
+    devicePlayerPrevStatusRef.current = null;
+
+    const unsubStatus = wsClient.on('player_status_changed', (payload) => {
+      if (!devicePlayerId || payload.player_id !== devicePlayerId) return;
+      const prev = devicePlayerPrevStatusRef.current;
+      devicePlayerPrevStatusRef.current = payload.status;
+
+      if (payload.status === 'withdrawn') {
+        setIsSessionTerminated(true);
+        Alert.alert('Retirado', 'Has sido retirado por el organizador.');
+      } else if (payload.status === 'not_started' && (prev === 'ready' || prev === 'playing')) {
+        setIsSessionTerminated(true);
+        Alert.alert('Dispositivo desvinculado', 'Tu dispositivo fue desvinculado. Vuelve a escanear el código de grupo.');
+      }
+    });
+
+    const unsubFinished = wsClient.on('round_finished', () => {
+      setIsSessionTerminated(true);
+    });
+
+    return () => {
+      unsubStatus();
+      unsubFinished();
+    };
+  }, [devicePlayerId]);
 
   // ─── Persistir currentHole y currentScreen cuando cambian ──────────────────
 
@@ -293,7 +325,7 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
   }, []);
 
   const saveHole = useCallback(async (holeNumber: number) => {
-    if (!activeRoundId) return;
+    if (!activeRoundId || isSessionTerminated) return;
 
     const savedScores: Array<{ playerId: string; score: number; par: number; handicap: number }> = [];
 
@@ -348,7 +380,7 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
       });
       return next;
     });
-  }, [activeRoundId, playerScoresMap]);
+  }, [activeRoundId, playerScoresMap, isSessionTerminated]);
 
   const goToNextHole = useCallback(() => setCurrentHole((h) => Math.min(h + 1, 18)), []);
   const goToPreviousHole = useCallback(() => setCurrentHole((h) => Math.max(h - 1, 1)), []);
@@ -430,6 +462,7 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
     activeRoundId,
     isLoaded,
     currentScreen,
+    isSessionActive: !isSessionTerminated,
     setCourseInfo,
     setGameInfo,
     setDevicePlayer,

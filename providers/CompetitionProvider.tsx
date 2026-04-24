@@ -1,5 +1,6 @@
 import createContextHook from '@nkzw/create-context-hook';
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { Alert } from 'react-native';
 import { Q } from '@nozbe/watermelondb';
 import type { Competition, PlayerScores, HoleScore } from '../types/game';
 import {
@@ -62,6 +63,8 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
   const [visiblePlayerIds, setVisiblePlayerIds] = useState<string[]>([]);
   const [activeRoundId, setActiveRoundId] = useState<string | null>(null);
   const [wsLeaderboard, setWsLeaderboard] = useState<LeaderboardEntry[] | null>(null);
+  const [isSessionTerminated, setIsSessionTerminated] = useState(false);
+  const devicePlayerPrevStatusRef = useRef<string | null>(null);
 
   // ─── Initial load ───────────────────────────────────────────────────────────
 
@@ -166,6 +169,35 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
 
     return unsub;
   }, [activeRoundId]);
+
+  // ─── WebSocket: organizer lifecycle (§2.g, §2.h, §2.i) ──────────────────────
+
+  useEffect(() => {
+    devicePlayerPrevStatusRef.current = null;
+
+    const unsubStatus = wsClient.on('player_status_changed', (payload) => {
+      if (!currentDevicePlayerId || payload.player_id !== currentDevicePlayerId) return;
+      const prev = devicePlayerPrevStatusRef.current;
+      devicePlayerPrevStatusRef.current = payload.status;
+
+      if (payload.status === 'withdrawn') {
+        setIsSessionTerminated(true);
+        Alert.alert('Retirado', 'Has sido retirado por el organizador.');
+      } else if (payload.status === 'not_started' && (prev === 'ready' || prev === 'playing')) {
+        setIsSessionTerminated(true);
+        Alert.alert('Dispositivo desvinculado', 'Tu dispositivo fue desvinculado. Vuelve a escanear el código de grupo.');
+      }
+    });
+
+    const unsubFinished = wsClient.on('round_finished', () => {
+      setIsSessionTerminated(true);
+    });
+
+    return () => {
+      unsubStatus();
+      unsubFinished();
+    };
+  }, [currentDevicePlayerId]);
 
   // ─── Persist currentHole and currentScreen ──────────────────────────────────
 
@@ -289,7 +321,7 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
   }, []);
 
   const saveHole = useCallback(async (holeNumber: number): Promise<void> => {
-    if (!competition || !activeRoundId) return;
+    if (!competition || !activeRoundId || isSessionTerminated) return;
 
     const visiblePlayers = competition.players.filter(
       (p) => scoringMode === 'all' || visiblePlayerIds.includes(p.id)
@@ -334,7 +366,7 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
     if (scores.length > 0) {
       await syncEngine.record('HOLE_SAVED', { round_id: activeRoundId, hole_number: holeNumber, scores }, activeRoundId);
     }
-  }, [competition, activeRoundId, playerScoresMap, scoringMode, visiblePlayerIds]);
+  }, [competition, activeRoundId, playerScoresMap, scoringMode, visiblePlayerIds, isSessionTerminated]);
 
   const goToNextHole = useCallback(() => setCurrentHole((h) => Math.min(h + 1, 18)), []);
   const goToPreviousHole = useCallback(() => setCurrentHole((h) => Math.max(h - 1, 1)), []);
@@ -450,7 +482,7 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
   return useMemo(() => ({
     competition, currentHole, holePars, holeHandicaps, playerScoresMap,
     isOnline, isLoaded, currentDevicePlayerId, deviceId, currentScreen,
-    scoringMode, visiblePlayerIds,
+    scoringMode, visiblePlayerIds, isSessionActive: !isSessionTerminated,
     startCompetition, updateScore, saveHole,
     goToNextHole, goToPreviousHole, goToHole,
     isHoleSaved, allHolesSaved, leaderboard,
@@ -460,7 +492,7 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
   }), [
     competition, currentHole, holePars, holeHandicaps, playerScoresMap,
     isOnline, isLoaded, currentDevicePlayerId, deviceId, currentScreen,
-    scoringMode, visiblePlayerIds,
+    scoringMode, visiblePlayerIds, isSessionTerminated,
     startCompetition, updateScore, saveHole,
     goToNextHole, goToPreviousHole, goToHole,
     isHoleSaved, allHolesSaved, leaderboard,
