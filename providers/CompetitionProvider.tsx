@@ -14,6 +14,7 @@ import { getCourseRouteData } from '@/services/course-service';
 import { syncEngine } from '@/services/sync-engine';
 import { wsClient } from '@/services/websocket';
 import type { LeaderboardEntry } from '@/services/websocket';
+import { apiRequest } from '@/services/api';
 import { database, Round, RoundPlayer, HoleScore as HoleScoreModel } from '@/database';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -65,6 +66,8 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
   const [wsLeaderboard, setWsLeaderboard] = useState<LeaderboardEntry[] | null>(null);
   const [isSessionTerminated, setIsSessionTerminated] = useState(false);
   const devicePlayerPrevStatusRef = useRef<string | null>(null);
+  const competitionRef = useRef<Competition | null>(null);
+  const leaderboardPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ─── Initial load ───────────────────────────────────────────────────────────
 
@@ -170,6 +173,43 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
     return unsub;
   }, [activeRoundId]);
 
+  // keep ref current so leaderboard poll always reads the latest competition
+  competitionRef.current = competition;
+
+  // ─── WebSocket: leaderboard REST fallback when WS drops 3× ──────────────────
+
+  useEffect(() => {
+    const stopPoll = () => {
+      if (leaderboardPollRef.current) {
+        clearInterval(leaderboardPollRef.current);
+        leaderboardPollRef.current = null;
+      }
+    };
+
+    const startPoll = () => {
+      stopPoll();
+      leaderboardPollRef.current = setInterval(async () => {
+        const comp = competitionRef.current;
+        if (!comp?.groupCode) return;
+        try {
+          const data = await apiRequest<{ leaderboard: LeaderboardEntry[] }>(
+            `/api/v1/scoring/leaderboard/${encodeURIComponent(comp.groupCode)}/`
+          );
+          setWsLeaderboard(data.leaderboard);
+        } catch {}
+      }, 15_000);
+    };
+
+    const unsubMax = wsClient.on('max_retries_reached', startPoll);
+    const unsubRecon = wsClient.on('reconnected', stopPoll);
+
+    return () => {
+      unsubMax();
+      unsubRecon();
+      stopPoll();
+    };
+  }, []);
+
   // ─── WebSocket: organizer lifecycle (§2.g, §2.h, §2.i) ──────────────────────
 
   useEffect(() => {
@@ -239,7 +279,7 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
         r.routeName = comp.routeName ?? '';
         r.currentHole = 1;
         r.status = 'in_progress';
-        r.scoringMode = 'all';
+        r.scoringMode = comp.scoringMode ?? 'all';
         r.visiblePlayerIds = '[]';
         r.holePars = JSON.stringify(pars);
         r.holeHandicaps = JSON.stringify(hcps);
@@ -295,7 +335,7 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
     setPlayerScoresMap(scoresMap);
     setActiveRoundId(roundId);
     setCurrentScreen(undefined);
-    setScoringMode('all');
+    setScoringMode(comp.scoringMode ?? 'all');
     setVisiblePlayerIds([]);
     setWsLeaderboard(null);
 

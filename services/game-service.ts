@@ -11,6 +11,7 @@ export interface FirebaseCompetitionData {
   course_name?: string;
   route_name?: string;
   session_uuid?: string;
+  effective_scoring_entry_mode?: string;
 }
 
 export interface LicensePlayer {
@@ -42,6 +43,7 @@ export interface FoundCompetitionSession {
   courseName?: string;
   routeName?: string;
   sessionUuid?: string;
+  scoringMode?: 'all' | 'partial';
 }
 
 export interface PlayerStatus {
@@ -154,6 +156,7 @@ export async function findCompetitionByDeviceId(
       courseName: comp.course_name,
       routeName: comp.route_name,
       sessionUuid: comp.session_uuid,
+      scoringMode: comp.effective_scoring_entry_mode === 'partial' ? 'partial' : 'all',
     };
   } catch {
     return null;

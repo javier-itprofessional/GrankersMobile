@@ -23,13 +23,17 @@ export type WsEventType =
   | 'leaderboard_updated'
   | 'score_confirmed'
   | 'player_status_changed'
-  | 'round_finished';
+  | 'round_finished'
+  | 'max_retries_reached'
+  | 'reconnected';
 
 export type WsEventPayload = {
   leaderboard_updated: { round_id: string; leaderboard: LeaderboardEntry[] };
   score_confirmed: { action_id: string; materialized: boolean };
   player_status_changed: PlayerStatusEvent;
   round_finished: { round_id: string; closed_at: string };
+  max_retries_reached: Record<string, never>;
+  reconnected: Record<string, never>;
 };
 
 type Listener<T extends WsEventType> = (payload: WsEventPayload[T]) => void;
@@ -90,6 +94,9 @@ class WebSocketClient {
     this.socket = new WebSocket(url);
 
     this.socket.onopen = () => {
+      if (this.reconnectAttempt > 0) {
+        this.emit('reconnected', {} as Record<string, never>);
+      }
       this.reconnectAttempt = 0;
     };
 
@@ -123,6 +130,9 @@ class WebSocketClient {
     this.clearReconnectTimer();
     const delay = RECONNECT_DELAYS[Math.min(this.reconnectAttempt, RECONNECT_DELAYS.length - 1)];
     this.reconnectAttempt++;
+    if (this.reconnectAttempt === 3) {
+      this.emit('max_retries_reached', {} as Record<string, never>);
+    }
     this.reconnectTimer = setTimeout(() => {
       this.open().catch(() => {});
     }, delay);

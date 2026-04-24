@@ -21,12 +21,17 @@
 | §2.h | Organizer lifecycle (round_finished) | ✅ backend emite | ✅ **done** | isSessionActive=false en CompetitionProvider + FreePlayProvider |
 | §2.i | Organizer withdraw → `withdrawn` | ✅ backend emite | ✅ **done** | Alert + isSessionActive=false |
 | §3 | Sync pull incremental `GET /sync/pull/?since=` | ✅ shipped 7.2.b | ✅ **done** | SyncEngine.pull() + AppState + 5 min interval |
-| Phase 7.2.a | Bootstrap leaderboards en /sync/bootstrap/ | ✅ shipped | ✅ done | — |
+| Phase 7.2.a | Bootstrap leaderboards en /sync/bootstrap/ | ✅ shipped | ✅ **done** | SyncEngine.bootstrap() — 24h guard + AppState |
+| Phase 7.2.b | Re-bootstrap ≥24h inactivity | ✅ shipped | ✅ **done** | `last_bootstrap_ms` en app_config; comprobado en start() y foreground |
 | Phase 7.2.c | `avatar_url` real en /players/search/ | ✅ shipped | ✅ **done** | `SearchResultCard` muestra imagen |
 | §4.a | Tabla `pending_syncs` legacy | — | ✅ **done** | Drop en schema v7, modelo y offline-sync limpiados |
 | §4.b | `GameProvider` legacy | — | ✅ **done** | Eliminado; review.tsx usa useCompetition/useFreePlay |
 | §4.c | Logs/toasts con tokens españoles | — | ✅ limpio | Grep confirma 0 hits de wire tokens fuera de migrations |
 | §4.d | `free-play/waiting-players.tsx` obsoleto | — | ✅ **done** | Eliminado |
+| §4.e | `free-play/search-license.tsx` — params legacy | — | ✅ **done** | `groupName` eliminado de params type y push |
+| §5.a | `effective_scoring_entry_mode` en CompetitionProvider | ✅ shipped | ✅ **done** | `FirebaseCompetitionData` + `Competition.scoringMode` + startCompetition |
+| §5.b | Leaderboard REST fallback (WS cae 3×) | ✅ | ✅ **done** | `max_retries_reached` → poll `GET /scoring/leaderboard/{groupCode}/` cada 15s |
+| §5.c | WS `reconnected` cancela poll REST | ✅ | ✅ **done** | `reconnected` event en wsClient detiene el intervalo |
 
 ---
 
@@ -96,86 +101,107 @@ El handler está cableado. El publisher Celery ya activo.
 - `setup.tsx` captura `ScoringSession.uuid` de `createFreePlayGame` y pasa como `sessionUuid` param
 - `select-device-player.tsx` pasa `sessionUuid` a `startFreePlay`
 
-### ⬜ 2.f — Validador regex de `X-Device-ID` en backend
+### ✅ 2.f — Validador regex de `X-Device-ID` en backend
 
 - `crypto.randomUUID()` v4 pasa (36 chars, hex + guiones ✅)
 
-### ⬜ 2.g — Organizer-initiated unlink
+### ✅ 2.g — Organizer-initiated unlink
 
-- [ ] En `CompetitionProvider` y `FreePlayProvider`: detectar `player_status_changed` donde el jugador propio vuelve a `not_started` desde `ready/playing`
-- [ ] Mostrar alerta: "Tu dispositivo fue desvinculado. Vuelve a escanear el código de grupo."
-- [ ] Detener envío de nuevas acciones al sync engine
+- `player_status_changed` donde `status === 'not_started'` y prev era `ready/playing` → Alert + `isSessionTerminated = true`
+- Aplicado en `CompetitionProvider` y `FreePlayProvider`
 
-### ⬜ 2.h — Organizer lifecycle changes
+### ✅ 2.h — Organizer lifecycle changes
 
-- [ ] Deshabilitar entrada cuando `session.status !== 'in_progress'`
-- [ ] Leer `session.status` en bootstrap/pull
+- `round_finished` WS → `isSessionTerminated = true` en ambos providers
+- `saveHole` gateado por `isSessionTerminated`
 
-### ⬜ 2.i — Organizer withdraw
+### ✅ 2.i — Organizer withdraw
 
-- [ ] Cuando `player_status_changed` muestra `status = withdrawn` para el jugador propio: alerta + stop cola
-
----
-
-## §3 — Sync pull incremental (Phase 7.2.b) — backend shipped
-
-Backend ya serve `GET /api/v1/sync/pull/?since=<ms>`.
-
-- [ ] `services/sync-engine.ts`: llamar al endpoint al volver a primer plano + cada 5 min mientras activo
-- [ ] Almacenar watermarks en `app_config`:
-  - `last_pull_tour_events_ms`
-  - `last_pull_players_cache_ms`
-  - `last_pull_rankings_cache_ms`
-- [ ] Tablas que se benefician: `tour_events`, `players_cache`, `leaderboard_cache` (warm-start), `rankings_cache`
+- `player_status_changed` con `status === 'withdrawn'` → Alert + `isSessionTerminated = true`
 
 ---
 
-## §4 — Limpieza en mobile
+## §3 — Sync pull incremental (Phase 7.2.b) — ✅ completado
 
-### ⬜ 4.a — Tabla `pending_syncs` legacy
+`GET /api/v1/sync/pull/?since=<ms>` implementado en `SyncEngine`:
 
-- [ ] Añadir migración para dropearla (schema v7)
-- [ ] No hay dependencia backend
-
-### ⬜ 4.b — `GameProvider` legacy
-
-- [ ] Eliminar `providers/GameProvider.tsx`
-- [ ] Eliminar referencias en `_layout.tsx`
-
-### ⬜ 4.c — Logs / toasts con tokens españoles
-
-- [ ] Grep de `codigo_grupo`, `nombre_competicion`, `apellido` fuera de la capa de transformación
-- [ ] Sustituir en mensajes de error, toasts y breadcrumbs de Sentry
-
-### ⬜ 4.d — `free-play/waiting-players.tsx` obsoleto
-
-Con el modelo flat, el flujo navega directamente a `/game/scoring`.
-
-- [ ] Evaluar si se elimina o se repropósita
-
-### ⬜ 4.e — `free-play/search-license.tsx` — params legacy
-
-La pantalla todavía pasa/recibe `groupName`. Confirmar que se puede eliminar.
+- `pull()` → upsert de `players_cache` y `tour_events`; actualiza watermark `last_pull_ms`
+- Intervalo de 5 min mientras activo
+- Se ejecuta al volver a primer plano (AppState)
 
 ---
 
-## §5 — Tests a añadir
+## Phase 7.2.a + 7.2.b — Bootstrap ≥24h — ✅ completado
+
+- `SyncEngine.bootstrap()`: llama `POST /api/v1/sync/bootstrap/` si >24h desde `last_bootstrap_ms`
+- Ejecutado en `start()` y en cada foreground (AppState)
+
+---
+
+## §4 — Limpieza en mobile — ✅ completada
+
+### ✅ 4.a — Tabla `pending_syncs` legacy
+
+- Migración v7 dropea la tabla
+- `PendingSync` modelo y funciones de `offline-sync.ts` eliminados
+
+### ✅ 4.b — `GameProvider` legacy
+
+- `providers/GameProvider.tsx` eliminado
+- `review.tsx` usa `useCompetition` + `useFreePlay`
+
+### ✅ 4.c — Logs / toasts con tokens españoles
+
+- Grep confirma 0 hits de wire tokens en código activo
+
+### ✅ 4.d — `free-play/waiting-players.tsx` obsoleto
+
+- Eliminado; flujo navega directamente a `/game/scoring`
+
+### ✅ 4.e — `free-play/search-license.tsx` — params legacy
+
+- `groupName` eliminado del type de params y del push de regreso a `setup.tsx`
+
+---
+
+## §5 — Backend-driven scoring mode + leaderboard fallback — ✅ completado
+
+### ✅ 5.a — `effective_scoring_entry_mode`
+
+- `FirebaseCompetitionData` (en `types/game.ts` y `game-service.ts`): campo `effective_scoring_entry_mode?`
+- `FoundCompetitionSession.scoringMode` mapeado desde el wire
+- `Competition.scoringMode` en `types/game.ts`
+- `confirmation.tsx` pasa `scoringMode` al construir `Competition`
+- `CompetitionProvider.startCompetition` usa `comp.scoringMode ?? 'all'` en lugar de hardcoded `'all'`
+
+### ✅ 5.b — Leaderboard REST fallback
+
+- `wsClient` emite `max_retries_reached` cuando `reconnectAttempt === 3`
+- `wsClient` emite `reconnected` en `onopen` si venía de reconexión
+- `CompetitionProvider` escucha `max_retries_reached` → inicia poll `GET /api/v1/scoring/leaderboard/{groupCode}/` cada 15s
+- `CompetitionProvider` escucha `reconnected` → detiene el poll
+
+---
+
+## §6 — Tests a añadir
 
 - [ ] Integration: WS `score_confirmed` después de sync HTTP 200 → no doble-limpieza de cola
 - [ ] Integration: batch de 50 acciones en red inestable → 5 reintentos → backoff `5s → 30s → 2m → 10m`
 - [ ] Integration: `action_id` duplicado en dos batches → backend deduplica; mobile marca ambos como synced
 - [ ] Device-ID migration: reinstalación genera nuevo UUID → `link-device` reemplaza el hash anterior
 - [ ] WS reconnect: `session_uuid` nulo en primer `startCompetition` → WS falla 4404; tras link-device refetch → WS OK
+- [ ] `effective_scoring_entry_mode = 'partial'` → `CompetitionProvider.scoringMode === 'partial'` tras startCompetition
+- [ ] WS cae 3 veces → leaderboard poll arranca; WS reconecta → poll se detiene
 
 ---
 
-## §6 — Cosas que el dashboard web ya hace (awareness móvil)
+## §7 — Cosas que el dashboard web ya hace (awareness móvil)
 
 | Acción organizador | Efecto WS | Respuesta esperada mobile |
 |---|---|---|
-| Desvincular dispositivo | `player_status_changed` → `not_started` | Alerta + stop sync (§2.g) |
-| Suspender ronda | `score_confirmed` server-originated | Deshabilitar entrada de scores (§2.h) |
-| Retirar jugador | `player_status_changed` → `withdrawn` | Alerta + stop sync (§2.i) |
+| Desvincular dispositivo | `player_status_changed` → `not_started` | Alert + stop sync (§2.g ✅) |
+| Suspender ronda | `round_finished` | isSessionActive=false (§2.h ✅) |
+| Retirar jugador | `player_status_changed` → `withdrawn` | Alert + stop sync (§2.i ✅) |
 
 ---
 
@@ -183,13 +209,13 @@ La pantalla todavía pasa/recibe `groupName`. Confirmar que se puede eliminar.
 
 1. **Routes model** — `Route` es una entidad de primer nivel (scorecard variant por tee + género). `TourEventStartTime` = scheduling. No son sinónimos.
 
-2. **Scoring mode** — `effective_scoring_entry_mode` ya en `GET /competitions/{group_code}/`. `CompetitionProvider.scoringMode` debe leer este campo. Free-play siempre auto-score.
+2. **Scoring mode** — `effective_scoring_entry_mode` ya en `GET /competitions/{group_code}/`. `CompetitionProvider.scoringMode` lee este campo. Free-play siempre auto-score.
 
 3. **Leaderboard refresh** — cascade:
-   - Cold start → `POST /sync/bootstrap/`
-   - WS activo → push `leaderboard_updated`
-   - WS caído 3× → REST poll `GET /scoring/leaderboard/<event>/` cada 15s
-   - ≥5 min en background → pull `GET /sync/pull/?since=<ts>` (§3 pending)
-   - ≥24h inactivo → re-bootstrap
+   - Cold start → `POST /sync/bootstrap/` (24h guard ✅)
+   - WS activo → push `leaderboard_updated` ✅
+   - WS caído 3× → REST poll `GET /scoring/leaderboard/<event>/` cada 15s ✅
+   - ≥5 min en background → pull `GET /sync/pull/?since=<ts>` ✅
+   - ≥24h inactivo → re-bootstrap ✅
 
 4. **Attachment types** — `photo` + `signature` únicamente. `video` y `document` fuera de scope.

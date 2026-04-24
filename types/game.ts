@@ -31,6 +31,7 @@ export interface Competition {
   courseName?: string;
   routeName?: string;
   sessionUuid?: string;
+  scoringMode?: 'all' | 'partial';
 }
 
 export interface GameState {
@@ -55,4 +56,5 @@ export interface FirebaseCompetitionData {
   course_name?: string;
   route_name?: string;
   session_uuid?: string;
+  effective_scoring_entry_mode?: string;
 }

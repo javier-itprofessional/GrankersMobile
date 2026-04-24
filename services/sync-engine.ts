@@ -8,6 +8,7 @@ import { subscribeToConnectionChanges, getAppConfig, setAppConfig } from '@/lib/
 const MAX_RETRIES = 5;
 const BATCH_SIZE = 50;
 const FLUSH_INTERVAL_MS = 30_000;   // flush periódico cada 30s
+const BOOTSTRAP_MAX_AGE_MS = 24 * 60 * 60 * 1_000;  // 24h
 
 // ─── Tipos del protocolo ──────────────────────────────────────────────────────
 
@@ -184,6 +185,19 @@ class SyncEngine {
     });
   }
 
+  // ─── Bootstrap (cold start / ≥24h inactivity) ────────────────────────────
+
+  async bootstrap(): Promise<void> {
+    try {
+      const lastBootstrap = parseInt(await getAppConfig('last_bootstrap_ms') ?? '0', 10);
+      if (Date.now() - lastBootstrap < BOOTSTRAP_MAX_AGE_MS) return;
+      await apiRequest('/api/v1/sync/bootstrap/', { method: 'POST' });
+      await setAppConfig('last_bootstrap_ms', String(Date.now()));
+    } catch {
+      // silently fail — will retry next foreground
+    }
+  }
+
   // ─── Sync pull incremental ────────────────────────────────────────────────
 
   async pull(): Promise<void> {
@@ -276,10 +290,12 @@ class SyncEngine {
     }, PULL_INTERVAL_MS);
 
     this.pull().catch(() => {});
+    this.bootstrap().catch(() => {});
 
     this.appStateSubscription = AppState.addEventListener('change', (nextState) => {
       if (this.lastAppState !== 'active' && nextState === 'active') {
         this.pull().catch(() => {});
+        this.bootstrap().catch(() => {});
       }
       this.lastAppState = nextState;
     });

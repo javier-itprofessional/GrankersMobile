@@ -18,14 +18,13 @@ import SearchResultCard from '../../components/SearchResultCard';
 
 export default function SearchLicenseScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ 
-    playerIndex: string; 
+  const params = useLocalSearchParams<{
+    playerIndex: string;
     numberOfPlayers?: string;
     existingPlayers?: string;
     courseName?: string;
     routeName?: string;
     gameName?: string;
-    groupName?: string;
   }>();
   const playerIndex = params.playerIndex || '1';
   
@@ -120,7 +119,6 @@ export default function SearchLicenseScreen() {
         courseName: params.courseName,
         routeName: params.routeName,
         gameName: params.gameName,
-        groupName: params.groupName,
       },
     });
   };
