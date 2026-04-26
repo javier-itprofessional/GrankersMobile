@@ -1,8 +1,21 @@
 # Backend TODO — Integración Mobile
 
-> Generado 2026-04-24.  
+> Generado 2026-04-24. Última actualización 2026-04-26.  
 > Referencia: `docs/todo.md` (lado mobile), `docs/technical-architecture.md`.  
-> Estado mobile: branch `main`, commit `114ec20`.
+> Estado mobile: branch `local_database_updates` (v2 cleanup + tests completados).
+
+---
+
+## Ships de backend incorporados desde última sync (2026-04-24)
+
+| Commit | Qué shippeó | Impacto mobile |
+|--------|-------------|----------------|
+| `c1e6c665` | `effective_scoring_entry_mode` rename permanente en `/competitions/{group_code}/` y `/sync/pull/` | Mobile eliminó alias `scoring_entry_mode` (§v2-cleanup.1 ✅) |
+| `a89e62e8` | `GET /api/v1/scoring/leaderboard/{group_code}/` | REST fallback del WS ya llega a endpoint real (B-2 ✅) |
+| `c1e6c665` | Campos extra en `/competitions/active/`: `route_name`, `player_id`, `player_first_name`, `player_last_name` | Mobile puede prescindir de la segunda llamada a `/competitions/{group_code}/` para identidad del jugador |
+| `f3ab6c41` | `vs_par` numérico en `leaderboard_updated` WS + REST leaderboard | Líderes en rondas parciales se muestran correctamente |
+
+> **Pendiente confirmar:** I-1 — campo `reason` vs `error` en `/api/v1/sync/` (ver abajo).
 
 ---
 
@@ -57,7 +70,7 @@ Cada 15s llama a este endpoint y usa la respuesta para actualizar el leaderboard
 > Mismo shape que el payload de `leaderboard_updated` por WS.  
 > Si la URL real es diferente (por ejemplo `/api/v1/competitions/{group_code}/leaderboard/`), avisar a mobile.
 
-**Estado backend:** ⬜ No confirmado
+**Estado backend:** ✅ shipped `a89e62e8` — `vs_par` numérico también confirmado (`f3ab6c41`)
 
 ---
 
@@ -425,7 +438,7 @@ El doc está desactualizado en varios puntos. Backend debe actualizar antes del 
 | `POST /api/v1/sync/` con idempotencia | ✅ | Verificar campo `reason` |
 | `GET /api/v1/sync/pull/?since=` | ✅ shipped 7.2.b | Verificar `server_time_ms` |
 | `POST /api/v1/sync/bootstrap/` | ✅ shipped | Verificar si response tiene datos |
-| `GET /api/v1/scoring/leaderboard/{group_code}/` | ⬜ **No confirmado** | **PENDIENTE** |
+| `GET /api/v1/scoring/leaderboard/{group_code}/` | ✅ shipped `a89e62e8` | Funcionando |
 | WS canal por `ScoringSession.uuid` | ✅ | Verificar routing |
 | WS `leaderboard_updated` English fields | ✅ | Verificar `position` + `first_name` |
 | WS `score_confirmed` | ✅ shipped 7.1.c | Funcionando |

@@ -63,7 +63,7 @@ const NON_RETRIABLE_PREFIXES = new Set(['invalid_payload', 'unauthorized', 'not_
 
 // ─── SyncEngine ───────────────────────────────────────────────────────────────
 
-class SyncEngine {
+export class SyncEngine {
   private flushTimer: ReturnType<typeof setInterval> | null = null;
   private pullTimer: ReturnType<typeof setInterval> | null = null;
   private appStateSubscription: ReturnType<typeof AppState.addEventListener> | null = null;

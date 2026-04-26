@@ -42,7 +42,7 @@ type Listener<T extends WsEventType> = (payload: WsEventPayload[T]) => void;
 
 const RECONNECT_DELAYS = [1000, 2000, 5000, 10000, 30000]; // backoff escalonado
 
-class WebSocketClient {
+export class WebSocketClient {
   private socket: WebSocket | null = null;
   private roundId: string | null = null;
   private listeners = new Map<string, Set<Listener<WsEventType>>>();

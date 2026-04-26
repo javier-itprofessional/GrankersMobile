@@ -210,7 +210,7 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
   }, []);
 
   const startFreePlay = useCallback(async (playersList: Player[], sessionUuid?: string) => {
-    // Obtener pars y handicaps reales del campo (o fallback aleatorio)
+    // Fetch real pars and handicaps from the course; fall back to random if unavailable
     let pars = generateHolePars();
     let hcps = holeHandicaps;
     if (courseName && routeName) {
@@ -310,7 +310,7 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
   }, [courseName, routeName, gameName, groupName, holeHandicaps]);
 
   const updateScore = useCallback((playerId: string, holeNumber: number, newScore: number) => {
-    // Solo actualiza memoria — se persiste al guardar el hoyo
+    // In-memory only — persisted when the hole is saved
     setPlayerScoresMap((prev) => {
       const next = new Map(prev);
       const ps = next.get(playerId);

@@ -35,7 +35,7 @@ const setConfig = async (key: string, value: string): Promise<void> => {
 export const generateDeviceId = async (): Promise<string> => {
   let deviceId = await getConfig('device_id');
   if (!deviceId) {
-    deviceId = `device_${Date.now()}_${Math.random().toString(36).slice(2, 15)}`;
+    deviceId = crypto.randomUUID();
     await setConfig('device_id', deviceId);
   }
   return deviceId;

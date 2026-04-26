@@ -12,7 +12,7 @@ interface CreateSessionRequest {
   course_uuid: string;
   mode: 'competition' | 'free-play';
   tee_color?: string;
-  tour_event_uuid?: string;   // solo si mode = 'competition'
+  tour_event_uuid?: string;   // only when mode = 'competition'
   group_code?: string;
   players: SessionPlayer[];
 }
@@ -36,11 +36,7 @@ export interface ScoringSession {
 
 // ─── Funciones ────────────────────────────────────────────────────────────────
 
-/**
- * Inicia una sesión de juego en el servidor.
- * Llamar al comenzar una ronda si hay conectividad.
- * Si offline, omitir — el ROUND_STARTED del action_log lo creará en el servidor al sincronizar.
- */
+// If offline, skip — ROUND_STARTED in the action_log will create the session on the server when synced.
 export async function createScoringSession(params: CreateSessionRequest): Promise<ScoringSession> {
   return apiRequest<ScoringSession>('/api/1/scoring/session', {
     method: 'POST',
@@ -48,16 +44,10 @@ export async function createScoringSession(params: CreateSessionRequest): Promis
   });
 }
 
-/**
- * Obtiene la tarjeta de puntuación materializada desde el servidor.
- */
 export async function getScorecard(sessionUuid: string): Promise<unknown> {
   return apiRequest(`/api/1/scoring/session/${sessionUuid}/scorecard`);
 }
 
-/**
- * Obtiene el leaderboard en vivo para un evento del tour.
- */
 export async function getLiveLeaderboard(eventUuid: string): Promise<unknown> {
   return apiRequest(`/api/1/scoring/leaderboard/${eventUuid}`);
 }

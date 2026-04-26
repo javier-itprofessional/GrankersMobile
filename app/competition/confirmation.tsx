@@ -21,7 +21,7 @@ export default function ConfirmationScreen() {
       courseName: competition.course_name,
       routeName: competition.route_name,
       sessionUuid: competition.session_uuid,
-      scoringMode: (competition.effective_scoring_entry_mode ?? competition.scoring_entry_mode) === 'partial' ? 'partial' : 'all',
+      scoringMode: competition.effective_scoring_entry_mode === 'partial' ? 'partial' : 'all',
       players: competition.players.map((p) => ({
         id: p.id, firstName: p.first_name, lastName: p.last_name,
         license: p.license, handicap: p.handicap,

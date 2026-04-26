@@ -4,21 +4,21 @@ import { field, text } from '@nozbe/watermelondb/decorators';
 // ─── Tipos de acción ──────────────────────────────────────────────────────────
 
 export type ActionType =
-  // Puntuación
+  // Scoring
   | 'HOLE_SAVED'
   | 'SCORE_AMENDED'
   | 'PENALTY_ADDED'
-  // Jugador / ronda
+  // Player / round
   | 'PLAYER_READY'
   | 'ROUND_STARTED'
   | 'ROUND_FINISHED'
   | 'ROUND_SUSPENDED'
   | 'ROUND_RESUMED'
-  // Concesiones / matchplay
+  // Concessions / matchplay
   | 'CONCESSION'
   | 'HOLE_WON'
   | 'HOLE_HALVED'
-  // Documentación
+  // Documentation
   | 'NOTE_ADDED'
   | 'MEDIA_ATTACHED'
   | 'SIGNATURE_ADDED';
