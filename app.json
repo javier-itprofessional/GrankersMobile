@@ -35,7 +35,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#336644"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.grankers.mobile"
