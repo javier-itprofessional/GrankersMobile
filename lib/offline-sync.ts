@@ -35,7 +35,10 @@ const setConfig = async (key: string, value: string): Promise<void> => {
 export const generateDeviceId = async (): Promise<string> => {
   let deviceId = await getConfig('device_id');
   if (!deviceId) {
-    deviceId = crypto.randomUUID();
+    deviceId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+    });
     await setConfig('device_id', deviceId);
   }
   return deviceId;
