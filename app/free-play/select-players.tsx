@@ -3,6 +3,7 @@ import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { Users, ArrowRight } from 'lucide-react-native';
 import { useState } from 'react';
 import Colors from '../../constants/colors';
+import { FontFamily } from '../../constants/Typography';
 import NumberSelector from '../../components/NumberSelector';
 
 export default function SelectPlayersScreen() {
@@ -101,11 +102,13 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   title: {
+    fontFamily: FontFamily.heading,
     fontSize: 26,
     fontWeight: '700' as const,
     color: Colors.golf.text,
   },
   subtitle: {
+    fontFamily: FontFamily.body,
     fontSize: 15,
     color: Colors.golf.textLight,
     textAlign: 'center',
@@ -126,6 +129,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   continueButtonText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 18,
     fontWeight: '700' as const,
     color: '#FFFFFF',

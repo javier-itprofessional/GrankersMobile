@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { useRouter, Stack } from 'expo-router';
 import { Trophy, Medal } from 'lucide-react-native';
 import Colors from '../../constants/colors';
+import { FontFamily } from '../../constants/Typography';
 import { useCompetition } from '../../providers/CompetitionProvider';
 import { useFreePlay } from '../../providers/FreePlayProvider';
 
@@ -129,12 +130,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   title: {
+    fontFamily: FontFamily.heading,
     fontSize: 24,
     fontWeight: '700' as const,
     color: Colors.golf.text,
     textAlign: 'center',
   },
   subtitle: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 16,
     color: Colors.golf.textLight,
     fontWeight: '500' as const,
@@ -170,6 +173,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   positionNumber: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 18,
     fontWeight: '700' as const,
     color: Colors.golf.text,
@@ -179,16 +183,19 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   playerName: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 17,
     fontWeight: '600' as const,
     color: Colors.golf.text,
   },
   playerNameLeader: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 18,
     fontWeight: '700' as const,
     color: Colors.golf.primary,
   },
   holesCompleted: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 13,
     color: Colors.golf.textLight,
     fontWeight: '500' as const,
@@ -198,6 +205,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   scoreValue: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 22,
     fontWeight: '700' as const,
     color: Colors.golf.text,
@@ -212,6 +220,7 @@ const styles = StyleSheet.create({
     color: Colors.golf.success,
   },
   totalScore: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 13,
     color: Colors.golf.textLight,
     fontWeight: '500' as const,
@@ -221,6 +230,7 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   emptyText: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 16,
     color: Colors.golf.textLight,
     fontWeight: '500' as const,

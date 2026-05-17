@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import { Search, Check, X } from 'lucide-react-native';
 import Colors from '../constants/colors';
+import { FontFamily } from '../constants/Typography';
 
 interface PlayerCardProps {
   index: number;
@@ -137,6 +138,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   playerLabel: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 16,
     fontWeight: '700' as const,
     color: Colors.golf.primary,
@@ -153,11 +155,13 @@ const styles = StyleSheet.create({
     borderColor: Colors.golf.primary,
   },
   searchLicenseText: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 13,
     fontWeight: '600' as const,
     color: Colors.golf.primary,
   },
   input: {
+    fontFamily: FontFamily.body,
     backgroundColor: Colors.golf.background,
     borderWidth: 1,
     borderColor: Colors.golf.border,
@@ -188,6 +192,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#EF4444',
   },
   statusButtonText: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 15,
     fontWeight: '600' as const,
     color: '#FFFFFF',
@@ -211,6 +216,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(34, 197, 94, 0.5)',
   },
   watermarkText: {
+    fontFamily: FontFamily.headingBold,
     fontSize: 28,
     fontWeight: '800' as const,
     color: 'rgba(34, 197, 94, 0.8)',

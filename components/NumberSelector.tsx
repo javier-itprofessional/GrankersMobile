@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Plus, Minus } from 'lucide-react-native';
 import Colors from '../constants/colors';
+import { FontFamily } from '../constants/Typography';
 
 interface NumberSelectorProps {
   value: number;
@@ -91,6 +92,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   text: {
+    fontFamily: FontFamily.headingBold,
     fontSize: 48,
     fontWeight: '700' as const,
     color: Colors.golf.primary,

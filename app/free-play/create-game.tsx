@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { Users, ArrowRight } from 'lucide-react-native';
 import Colors from '../../constants/colors';
+import { FontFamily } from '../../constants/Typography';
 
 export default function CreateGameScreen() {
   const router = useRouter();
@@ -114,18 +115,18 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   content: { padding: 20, gap: 32 },
   header: { alignItems: 'center', gap: 12 },
-  title: { fontSize: 26, fontWeight: '700' as const, color: Colors.golf.text },
-  subtitle: { fontSize: 15, color: Colors.golf.textLight, textAlign: 'center', lineHeight: 21 },
+  title: { fontFamily: FontFamily.heading, fontSize: 26, fontWeight: '700' as const, color: Colors.golf.text },
+  subtitle: { fontFamily: FontFamily.body, fontSize: 15, color: Colors.golf.textLight, textAlign: 'center', lineHeight: 21 },
   form: { gap: 20 },
   inputContainer: { gap: 8 },
-  label: { fontSize: 16, fontWeight: '600' as const, color: Colors.golf.text, marginLeft: 4 },
-  input: { backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 2, borderColor: Colors.golf.border, paddingHorizontal: 16, paddingVertical: 16, fontSize: 16, color: Colors.golf.text },
+  label: { fontFamily: FontFamily.bodySemi, fontSize: 16, fontWeight: '600' as const, color: Colors.golf.text, marginLeft: 4 },
+  input: { fontFamily: FontFamily.body, backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 2, borderColor: Colors.golf.border, paddingHorizontal: 16, paddingVertical: 16, fontSize: 16, color: Colors.golf.text },
   infoRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 4 },
-  infoLabel: { fontSize: 14, fontWeight: '600' as const, color: Colors.golf.textLight },
-  infoValue: { fontSize: 14, color: Colors.golf.text },
+  infoLabel: { fontFamily: FontFamily.bodySemi, fontSize: 14, fontWeight: '600' as const, color: Colors.golf.textLight },
+  infoValue: { fontFamily: FontFamily.body, fontSize: 14, color: Colors.golf.text },
   createButton: { backgroundColor: Colors.golf.primary, borderRadius: 14, paddingVertical: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, shadowColor: Colors.golf.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
-  createButtonText: { fontSize: 18, fontWeight: '700' as const, color: '#FFFFFF' },
+  createButtonText: { fontFamily: FontFamily.bodyBold, fontSize: 18, fontWeight: '700' as const, color: '#FFFFFF' },
   createButtonDisabled: { opacity: 0.6 },
   cancelButton: { backgroundColor: '#FFFFFF', borderRadius: 14, paddingVertical: 18, alignItems: 'center', borderWidth: 2, borderColor: Colors.golf.border },
-  cancelButtonText: { fontSize: 18, fontWeight: '700' as const, color: Colors.golf.textLight },
+  cancelButtonText: { fontFamily: FontFamily.bodyBold, fontSize: 18, fontWeight: '700' as const, color: Colors.golf.textLight },
 });

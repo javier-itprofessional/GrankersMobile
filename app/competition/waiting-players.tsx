@@ -3,6 +3,7 @@ import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { Users, Check, WifiOff, Square, CheckSquare, UserCheck, UsersRound } from 'lucide-react-native';
 import { useState, useEffect, useMemo } from 'react';
 import Colors from '../../constants/colors';
+import { FontFamily } from '../../constants/Typography';
 import { subscribeToCompetitionPlayers, updatePlayerConnectionStatus } from '@/services/game-service';
 import type { PlayerStatus } from '@/services/game-service';
 import { useCompetition } from '@/providers/CompetitionProvider';
@@ -309,6 +310,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   title: {
+    fontFamily: FontFamily.heading,
     fontSize: 24,
     fontWeight: '700' as const,
     color: Colors.golf.text,
@@ -316,6 +318,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   subtitle: {
+    fontFamily: FontFamily.body,
     fontSize: 16,
     color: Colors.golf.textLight,
     textAlign: 'center',
@@ -328,11 +331,13 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   counterText: {
+    fontFamily: FontFamily.headingBold,
     fontSize: 48,
     fontWeight: '700' as const,
     color: Colors.golf.primary,
   },
   counterLabel: {
+    fontFamily: FontFamily.body,
     fontSize: 14,
     color: Colors.golf.textLight,
     marginTop: 4,
@@ -373,6 +378,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.golf.warning,
   },
   playerName: {
+    fontFamily: FontFamily.bodySemi,
     flex: 1,
     fontSize: 16,
     fontWeight: '600' as const,
@@ -382,6 +388,7 @@ const styles = StyleSheet.create({
     color: Colors.golf.text,
   },
   playerStatusConnected: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 13,
     fontWeight: '500' as const,
     color: Colors.golf.success,
@@ -394,6 +401,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   offlineLabel: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 13,
     fontWeight: '500' as const,
     color: Colors.golf.textLight,
@@ -406,6 +414,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   offlineHint: {
+    fontFamily: FontFamily.body,
     marginTop: 12,
     fontSize: 13,
     color: Colors.golf.textLight,
@@ -451,6 +460,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalTitle: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 20,
     fontWeight: '700' as const,
     color: Colors.golf.text,
@@ -458,6 +468,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   modalDescription: {
+    fontFamily: FontFamily.body,
     fontSize: 15,
     color: Colors.golf.textLight,
     textAlign: 'center',
@@ -476,6 +487,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   modalOptionAllText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 16,
     fontWeight: '700' as const,
     color: '#FFFFFF',
@@ -493,6 +505,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.golf.primary,
   },
   modalOptionPartialText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 16,
     fontWeight: '700' as const,
     color: Colors.golf.primary,

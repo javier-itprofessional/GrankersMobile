@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { Search } from 'lucide-react-native';
 import Colors from '../../constants/colors';
+import { FontFamily } from '../../constants/Typography';
 import { searchPlayerLicenses } from '@/services/game-service';
 import type { LicensePlayer } from '@/services/game-service';
 import SearchResultCard from '../../components/SearchResultCard';
@@ -252,6 +253,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   searchTitle: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 22,
     fontWeight: '700' as const,
     color: Colors.golf.text,
@@ -263,11 +265,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   inputLabel: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 14,
     fontWeight: '600' as const,
     color: Colors.golf.text,
   },
   input: {
+    fontFamily: FontFamily.body,
     backgroundColor: Colors.golf.background,
     borderWidth: 1,
     borderColor: Colors.golf.border,
@@ -296,6 +300,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   searchButtonText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 16,
     fontWeight: '700' as const,
     color: '#FFFFFF',
@@ -304,6 +309,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   resultsTitle: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 16,
     fontWeight: '600' as const,
     color: Colors.golf.text,

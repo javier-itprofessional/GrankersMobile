@@ -16,6 +16,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '../constants/colors';
+import { FontFamily } from '../constants/Typography';
 import { useCompetition } from '../providers/CompetitionProvider';
 import { useFreePlay } from '../providers/FreePlayProvider';
 import { usePlayerAuth } from '../providers/PlayerAuthProvider';
@@ -219,7 +220,7 @@ export default function WelcomeScreen() {
   if (!isLoaded) {
     return (
       <LinearGradient
-        colors={['#0D1B12', '#2D5E2F']}
+        colors={[Colors.golf.backgroundDark, Colors.golf.primaryDark]}
         style={styles.loadingContainer}
       >
         <Image
@@ -236,7 +237,7 @@ export default function WelcomeScreen() {
   if (screen === 'landing') {
     return (
       <LinearGradient
-        colors={['#0D1B12', '#1A3520', '#2D5E2F']}
+        colors={[Colors.golf.backgroundDark, '#0d3b1f', Colors.golf.primary]}
         style={styles.landingContainer}
         start={{ x: 0, y: 0 }}
         end={{ x: 0.3, y: 1 }}
@@ -470,7 +471,7 @@ const styles = StyleSheet.create({
     width: 380,
     height: 380,
     borderRadius: 190,
-    backgroundColor: 'rgba(61,123,63,0.12)',
+    backgroundColor: 'rgba(26,122,66,0.12)',
     top: -120,
     right: -100,
   },
@@ -479,7 +480,7 @@ const styles = StyleSheet.create({
     width: 280,
     height: 280,
     borderRadius: 140,
-    backgroundColor: 'rgba(245,166,35,0.07)',
+    backgroundColor: 'rgba(179,145,46,0.07)',
     bottom: 80,
     left: -80,
   },
@@ -502,6 +503,7 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   landingTagline: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 14,
     fontWeight: '400' as const,
     color: 'rgba(255,255,255,0.55)',
@@ -539,11 +541,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   googleIconLetter: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 15,
     fontWeight: '700' as const,
     color: '#FFFFFF',
   },
   btnGoogleText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 16,
     fontWeight: '700' as const,
     color: Colors.golf.text,
@@ -559,6 +563,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.15)',
   },
   dividerText: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 13,
     fontWeight: '500' as const,
     color: 'rgba(255,255,255,0.4)',
@@ -585,6 +590,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   btnHalfPrimaryText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 15,
     fontWeight: '700' as const,
     color: '#FFFFFF',
@@ -598,6 +604,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   btnHalfSecondaryText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 15,
     fontWeight: '700' as const,
     color: Colors.golf.primary,
@@ -610,6 +617,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   btnGhostText: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 14,
     fontWeight: '500' as const,
     color: 'rgba(255,255,255,0.5)',
@@ -637,6 +645,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   tagline: {
+    fontFamily: FontFamily.body,
     fontSize: 15,
     fontWeight: '400' as const,
     color: 'rgba(255,255,255,0.7)',
@@ -649,6 +658,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   sectionLabel: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 13,
     fontWeight: '600' as const,
     color: Colors.golf.textLight,
@@ -686,11 +696,13 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   menuTitle: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 17,
     fontWeight: '600' as const,
     color: Colors.golf.text,
   },
   menuSubtitle: {
+    fontFamily: FontFamily.body,
     fontSize: 13,
     fontWeight: '400' as const,
     color: Colors.golf.textLight,
@@ -701,6 +713,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   loginPromptText: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 13,
     fontWeight: '500' as const,
     color: Colors.golf.primary,

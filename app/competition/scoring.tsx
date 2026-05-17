@@ -3,6 +3,7 @@ import { useRouter, Stack } from 'expo-router';
 import { useEffect, useState, useMemo } from 'react';
 import { Minus, Plus, ArrowLeft, LogOut, ChevronRight } from 'lucide-react-native';
 import Colors from '../../constants/colors';
+import { FontFamily } from '../../constants/Typography';
 import { useCompetition } from '../../providers/CompetitionProvider';
 import ConnectionStatus from '../../components/ConnectionStatus';
 import HoleInfoPanel from '../../components/HoleInfoPanel';
@@ -371,11 +372,13 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   competitionName: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 18,
     fontWeight: '700' as const,
     color: '#FFFFFF',
   },
   pruebaText: {
+    fontFamily: FontFamily.body,
     fontSize: 14,
     fontWeight: '500' as const,
     color: 'rgba(255,255,255,0.7)',
@@ -394,12 +397,14 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   holeLabel: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 10,
     fontWeight: '700' as const,
     color: 'rgba(255,255,255,0.6)',
     letterSpacing: 1,
   },
   holeValue: {
+    fontFamily: FontFamily.headingBold,
     fontSize: 34,
     fontWeight: '800' as const,
     color: '#FFFFFF',
@@ -412,12 +417,14 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   parLabel: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 10,
     fontWeight: '700' as const,
     color: 'rgba(255,255,255,0.6)',
     letterSpacing: 1,
   },
   parValue: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 28,
     fontWeight: '700' as const,
     color: Colors.golf.primary,
@@ -430,12 +437,14 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   hcpLabel: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 10,
     fontWeight: '700' as const,
     color: 'rgba(255,255,255,0.6)',
     letterSpacing: 1,
   },
   hcpValue: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 28,
     fontWeight: '700' as const,
     color: '#FFFFFF',
@@ -455,6 +464,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   actionBtnText: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 14,
     fontWeight: '600' as const,
     color: '#FFFFFF',
@@ -472,6 +482,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   saveBtnText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 14,
     fontWeight: '700' as const,
     color: '#FFFFFF',
@@ -527,6 +538,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.golf.accent,
   },
   playerName: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 16,
     fontWeight: '600' as const,
     color: Colors.golf.text,
@@ -541,6 +553,7 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
   },
   tagMe: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 11,
     fontWeight: '700' as const,
     color: Colors.golf.primary,
@@ -551,6 +564,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   tagMarcando: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 11,
     fontWeight: '700' as const,
     color: Colors.golf.accent,
@@ -565,6 +579,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   playerScore: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 15,
     fontWeight: '700' as const,
     color: Colors.golf.text,
@@ -610,6 +625,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.golf.primary,
   },
   scoreValue: {
+    fontFamily: FontFamily.headingBold,
     fontSize: 32,
     fontWeight: '800' as const,
     color: Colors.golf.text,
@@ -630,6 +646,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   exitBtnText: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 15,
     fontWeight: '600' as const,
     color: Colors.golf.error,

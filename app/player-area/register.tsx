@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { UserPlus, Mail, Globe, FileText, ChevronRight, Check, CheckCircle } from 'lucide-react-native';
 import Colors from '@/constants/colors';
+import { FontFamily } from '@/constants/Typography';
 import { usePlayerAuth } from '@/providers/PlayerAuthProvider';
 import { register, loginWithGoogle } from '@/services/auth';
 
@@ -285,12 +286,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   successTitle: {
+    fontFamily: FontFamily.heading,
     fontSize: 26,
     fontWeight: '700' as const,
     color: Colors.golf.text,
     textAlign: 'center',
   },
   successSubtitle: {
+    fontFamily: FontFamily.body,
     fontSize: 15,
     fontWeight: '400' as const,
     color: Colors.golf.textLight,
@@ -298,10 +301,12 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   emailHighlight: {
+    fontFamily: FontFamily.bodySemi,
     fontWeight: '600' as const,
     color: Colors.golf.text,
   },
   successHint: {
+    fontFamily: FontFamily.body,
     fontSize: 13,
     fontWeight: '400' as const,
     color: Colors.golf.textLight,
@@ -326,6 +331,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   loginButtonText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 16,
     fontWeight: '700' as const,
     color: '#FFFFFF',
@@ -348,6 +354,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.golf.primary,
   },
   mainTitle: {
+    fontFamily: FontFamily.headingBold,
     fontSize: 28,
     fontWeight: '800' as const,
     color: Colors.golf.primary,
@@ -356,6 +363,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   mainSubtitle: {
+    fontFamily: FontFamily.body,
     fontSize: 15,
     fontWeight: '400' as const,
     color: Colors.golf.textLight,
@@ -368,6 +376,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   sectionLabel: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 13,
     fontWeight: '600' as const,
     color: Colors.golf.textLight,
@@ -400,11 +409,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   googleIconText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 18,
     fontWeight: '700' as const,
     color: '#FFFFFF',
   },
   googleButtonText: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 16,
     fontWeight: '600' as const,
     color: Colors.golf.text,
@@ -421,6 +432,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.golf.border,
   },
   dividerText: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 13,
     fontWeight: '500' as const,
     color: Colors.golf.textLight,
@@ -436,6 +448,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   fieldLabel: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 14,
     fontWeight: '600' as const,
     color: Colors.golf.text,
@@ -453,6 +466,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   textInput: {
+    fontFamily: FontFamily.body,
     flex: 1,
     fontSize: 15,
     fontWeight: '400' as const,
@@ -481,6 +495,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.golf.primary,
   },
   termsText: {
+    fontFamily: FontFamily.body,
     flex: 1,
     fontSize: 14,
     fontWeight: '400' as const,
@@ -488,6 +503,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   termsLink: {
+    fontFamily: FontFamily.bodySemi,
     color: Colors.golf.primary,
     fontWeight: '600' as const,
     textDecorationLine: 'underline' as const,
@@ -511,6 +527,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   registerButtonText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 16,
     fontWeight: '700' as const,
     color: '#FFFFFF',
@@ -525,11 +542,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   loginQuestion: {
+    fontFamily: FontFamily.body,
     fontSize: 15,
     fontWeight: '400' as const,
     color: Colors.golf.textLight,
   },
   loginAction: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 15,
     fontWeight: '700' as const,
     color: Colors.golf.primary,

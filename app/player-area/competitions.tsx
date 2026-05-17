@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Calendar, ClipboardList, ChevronRight, Trophy, Clock, MapPin, Navigation } from 'lucide-react-native';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import Colors from '@/constants/colors';
+import { FontFamily } from '@/constants/Typography';
 import { fetchUpcomingCompetition, fetchCompetitionData, linkDeviceToCompetitionPlayer } from '@/services/game-service';
 import * as Application from 'expo-application';
 import { useCompetition } from '@/providers/CompetitionProvider';
@@ -279,6 +280,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sectionTitle: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 13,
     fontWeight: '600' as const,
     color: Colors.golf.textLight,
@@ -316,12 +318,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   menuTitle: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 16,
     fontWeight: '600' as const,
     color: Colors.golf.text,
     marginBottom: 2,
   },
   menuSubtitle: {
+    fontFamily: FontFamily.body,
     fontSize: 13,
     fontWeight: '400' as const,
     color: Colors.golf.textLight,
@@ -355,6 +359,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   nextCompBadgeText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 12,
     fontWeight: '700' as const,
     color: '#FFFFFF',
@@ -362,6 +367,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   nextCompName: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 20,
     fontWeight: '700' as const,
     color: Colors.golf.text,
@@ -379,12 +385,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   nextCompInfoLabel: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 14,
     fontWeight: '500' as const,
     color: Colors.golf.textLight,
     width: 100,
   },
   nextCompInfoValue: {
+    fontFamily: FontFamily.bodySemi,
     flex: 1,
     fontSize: 15,
     fontWeight: '600' as const,
@@ -409,6 +417,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   teeButtonText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 17,
     fontWeight: '700' as const,
     color: '#FFFFFF',
@@ -421,6 +430,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   loadingText: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 15,
     fontWeight: '500' as const,
     color: Colors.golf.textLight,
@@ -433,6 +443,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   errorText: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 15,
     fontWeight: '500' as const,
     color: Colors.golf.error,
@@ -445,6 +456,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   retryButtonText: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 15,
     fontWeight: '600' as const,
     color: '#FFFFFF',
@@ -457,6 +469,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   emptyText: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 15,
     fontWeight: '500' as const,
     color: Colors.golf.textLight,

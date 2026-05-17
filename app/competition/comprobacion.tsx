@@ -3,6 +3,7 @@ import { useRouter, Stack } from 'expo-router';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { ClipboardCheck, Eye, PenLine, ChevronLeft, Check, Clock, Minus, Plus } from 'lucide-react-native';
 import Colors from '../../constants/colors';
+import { FontFamily } from '../../constants/Typography';
 import { useCompetition } from '../../providers/CompetitionProvider';
 
 export default function ComprobacionScreen() {
@@ -337,11 +338,13 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   headerTitle: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 20,
     fontWeight: '700' as const,
     color: '#FFFFFF',
   },
   headerSubtitle: {
+    fontFamily: FontFamily.body,
     fontSize: 14,
     fontWeight: '500' as const,
     color: 'rgba(255,255,255,0.7)',
@@ -375,6 +378,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.golf.border,
   },
   blockTitle: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 14,
     fontWeight: '700' as const,
     color: Colors.golf.text,
@@ -384,6 +388,7 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   markerName: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 16,
     fontWeight: '600' as const,
     color: Colors.golf.primary,
@@ -397,16 +402,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statLabel: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 14,
     fontWeight: '500' as const,
     color: Colors.golf.textLight,
   },
   statValue: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 20,
     fontWeight: '700' as const,
     color: Colors.golf.text,
   },
   statValueHighlight: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 17,
     fontWeight: '700' as const,
   },
@@ -432,12 +440,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   waitingText: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 14,
     fontWeight: '500' as const,
     color: '#8B6914',
     flex: 1,
   },
   noDataText: {
+    fontFamily: FontFamily.body,
     fontSize: 14,
     color: Colors.golf.textLight,
   },
@@ -457,6 +467,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   reviewButtonText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 16,
     fontWeight: '700' as const,
     color: Colors.golf.primary,
@@ -476,6 +487,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   signButtonText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 16,
     fontWeight: '700' as const,
     color: '#FFFFFF',
@@ -496,6 +508,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.golf.border,
   },
   modalTitle: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 17,
     fontWeight: '700' as const,
     color: Colors.golf.text,
@@ -508,6 +521,7 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   modalWaitingText: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 15,
     fontWeight: '500' as const,
     color: Colors.golf.textLight,
@@ -529,12 +543,14 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 12,
   },
   scorecardHeaderHole: {
+    fontFamily: FontFamily.bodyBold,
     flex: 1,
     fontSize: 12,
     fontWeight: '700' as const,
     color: '#FFFFFF',
   },
   scorecardHeaderPar: {
+    fontFamily: FontFamily.bodyBold,
     width: 50,
     fontSize: 12,
     fontWeight: '700' as const,
@@ -542,6 +558,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   scorecardHeaderScore: {
+    fontFamily: FontFamily.bodyBold,
     width: 60,
     fontSize: 12,
     fontWeight: '700' as const,
@@ -549,6 +566,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   scorecardHeaderAction: {
+    fontFamily: FontFamily.bodyBold,
     width: 50,
     fontSize: 12,
     fontWeight: '700' as const,
@@ -565,12 +583,14 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.golf.border,
   },
   scorecardHole: {
+    fontFamily: FontFamily.bodySemi,
     flex: 1,
     fontSize: 15,
     fontWeight: '600' as const,
     color: Colors.golf.text,
   },
   scorecardPar: {
+    fontFamily: FontFamily.bodyMedium,
     width: 50,
     fontSize: 14,
     fontWeight: '500' as const,
@@ -578,6 +598,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   scorecardScore: {
+    fontFamily: FontFamily.headingSemi,
     width: 60,
     fontSize: 17,
     fontWeight: '700' as const,
@@ -617,6 +638,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   editScoreValue: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 17,
     fontWeight: '700' as const,
     color: Colors.golf.primary,
@@ -642,12 +664,14 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 12,
   },
   totalLabel: {
+    fontFamily: FontFamily.bodyBold,
     flex: 1,
     fontSize: 15,
     fontWeight: '700' as const,
     color: Colors.golf.text,
   },
   totalPar: {
+    fontFamily: FontFamily.bodySemi,
     width: 50,
     fontSize: 14,
     fontWeight: '600' as const,
@@ -655,6 +679,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   totalScore: {
+    fontFamily: FontFamily.headingSemi,
     width: 60,
     fontSize: 17,
     fontWeight: '700' as const,

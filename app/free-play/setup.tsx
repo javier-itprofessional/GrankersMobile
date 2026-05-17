@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { Users } from 'lucide-react-native';
 import Colors from '../../constants/colors';
+import { FontFamily } from '../../constants/Typography';
 import { useFreePlay } from '../../providers/FreePlayProvider';
 import { createFreePlayGame } from '@/services/game-service';
 import PlayerCard from '../../components/PlayerCard';
@@ -327,11 +328,13 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   title: {
+    fontFamily: FontFamily.heading,
     fontSize: 26,
     fontWeight: '700' as const,
     color: Colors.golf.text,
   },
   subtitle: {
+    fontFamily: FontFamily.body,
     fontSize: 15,
     color: Colors.golf.textLight,
     textAlign: 'center',
@@ -353,6 +356,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   nextButtonText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 18,
     fontWeight: '700' as const,
     color: '#FFFFFF',
@@ -369,6 +373,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.golf.border,
   },
   cancelButtonText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 18,
     fontWeight: '700' as const,
     color: Colors.golf.textLight,

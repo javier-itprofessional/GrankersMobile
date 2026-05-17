@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'rea
 import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { CheckCircle, Cloud, CloudOff } from 'lucide-react-native';
 import Colors from '../../constants/colors';
+import { FontFamily } from '../../constants/Typography';
 import { useCompetition } from '../../providers/CompetitionProvider';
 import { useFreePlay } from '../../providers/FreePlayProvider';
 import { useState, useEffect } from 'react';
@@ -160,12 +161,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   title: {
+    fontFamily: FontFamily.heading,
     fontSize: 28,
     fontWeight: '700' as const,
     color: Colors.golf.success,
     textAlign: 'center',
   },
   subtitle: {
+    fontFamily: FontFamily.body,
     fontSize: 16,
     color: Colors.golf.textLight,
     textAlign: 'center',
@@ -187,11 +190,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   statValue: {
+    fontFamily: FontFamily.headingBold,
     fontSize: 48,
     fontWeight: '700' as const,
     color: Colors.golf.primary,
   },
   statLabel: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 14,
     fontWeight: '600' as const,
     color: Colors.golf.textLight,
@@ -210,6 +215,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   leaderboardTitle: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 18,
     fontWeight: '700' as const,
     color: Colors.golf.text,
@@ -230,17 +236,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   positionText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 16,
     fontWeight: '700' as const,
     color: '#FFFFFF',
   },
   playerName: {
+    fontFamily: FontFamily.bodySemi,
     flex: 1,
     fontSize: 16,
     fontWeight: '600' as const,
     color: Colors.golf.text,
   },
   playerScore: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 18,
     fontWeight: '700' as const,
   },
@@ -263,6 +272,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   finishButtonText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 18,
     fontWeight: '700' as const,
     color: '#FFFFFF',
@@ -277,6 +287,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#E8ECF4',
   },
   syncText: {
+    fontFamily: FontFamily.body,
     fontSize: 14,
     color: Colors.golf.textLight,
   },

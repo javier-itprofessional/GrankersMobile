@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import Colors from '../constants/colors';
+import { FontFamily } from '../constants/Typography';
 
 interface SearchResultCardProps {
   firstName: string;
@@ -72,6 +73,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   avatarText: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 16,
     fontWeight: '700' as const,
     color: Colors.golf.primary,
@@ -86,16 +88,19 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   name: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 18,
     fontWeight: '700' as const,
     color: Colors.golf.text,
   },
   license: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 14,
     color: Colors.golf.primary,
     fontWeight: '600' as const,
   },
   handicap: {
+    fontFamily: FontFamily.body,
     fontSize: 14,
     color: Colors.golf.textLight,
   },

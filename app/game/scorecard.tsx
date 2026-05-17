@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensio
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { Edit2, Save, Minus, Plus, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react-native';
 import Colors from '../../constants/colors';
+import { FontFamily } from '../../constants/Typography';
 import { useCompetition } from '../../providers/CompetitionProvider';
 import { useFreePlay } from '../../providers/FreePlayProvider';
 
@@ -471,11 +472,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   playerName: {
+    fontFamily: FontFamily.heading,
     fontSize: 26,
     fontWeight: '700' as const,
     color: Colors.golf.text,
   },
   competitionName: {
+    fontFamily: FontFamily.body,
     fontSize: 16,
     color: Colors.golf.textLight,
     fontWeight: '500' as const,
@@ -498,12 +501,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   summaryLabel: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 12,
     fontWeight: '600' as const,
     color: Colors.golf.textLight,
     textTransform: 'uppercase',
   },
   summaryValue: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 24,
     fontWeight: '700' as const,
     color: Colors.golf.text,
@@ -525,6 +530,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   sectionTitle: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 16,
     fontWeight: '700' as const,
     color: Colors.golf.primary,
@@ -542,6 +548,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.golf.border,
   },
   labelCell: {
+    fontFamily: FontFamily.bodySemi,
     width: 50,
     padding: 8,
     fontSize: 12,
@@ -549,6 +556,7 @@ const styles = StyleSheet.create({
     color: Colors.golf.textLight,
   },
   labelCellPlayer: {
+    fontFamily: FontFamily.bodyBold,
     width: 50,
     padding: 8,
     fontSize: 12,
@@ -556,6 +564,7 @@ const styles = StyleSheet.create({
     color: Colors.golf.primary,
   },
   cell: {
+    fontFamily: FontFamily.bodySemi,
     flex: 1,
     padding: 8,
     fontSize: 14,
@@ -564,6 +573,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   totalCell: {
+    fontFamily: FontFamily.bodyBold,
     width: 50,
     padding: 8,
     fontSize: 14,
@@ -573,6 +583,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.golf.background,
   },
   totalCellPlayer: {
+    fontFamily: FontFamily.bodyBold,
     width: 50,
     padding: 8,
     fontSize: 14,
@@ -609,6 +620,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   legendTitle: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 14,
     fontWeight: '700' as const,
     color: Colors.golf.text,
@@ -640,6 +652,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.golf.error + '15',
   },
   legendText: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 14,
     color: Colors.golf.text,
     fontWeight: '500' as const,
@@ -668,6 +681,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   backToOverviewText: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 16,
     fontWeight: '600' as const,
     color: Colors.golf.primary,
@@ -694,6 +708,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.golf.background + '80',
   },
   holeNavButtonText: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 14,
     fontWeight: '600' as const,
     color: Colors.golf.primary,
@@ -706,17 +721,20 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   holeNumberBadgeLabel: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 11,
     fontWeight: '500' as const,
     color: Colors.golf.textLight,
     textTransform: 'uppercase',
   },
   holeNumberBadgeValue: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 28,
     fontWeight: '700' as const,
     color: Colors.golf.primary,
   },
   holeNumberBadgePar: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 12,
     fontWeight: '600' as const,
     color: Colors.golf.textLight,
@@ -731,6 +749,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.golf.primary,
   },
   holeEditButtonText: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 14,
     fontWeight: '600' as const,
     color: '#FFFFFF',
@@ -747,6 +766,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.golf.primary,
   },
   holeEditButtonTextOutline: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 14,
     fontWeight: '600' as const,
     color: Colors.golf.primary,
@@ -767,6 +787,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   holeScoreLabel: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 18,
     fontWeight: '700' as const,
     color: Colors.golf.text,
@@ -808,6 +829,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.golf.primary,
   },
   holeScoreValue: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 48,
     fontWeight: '700' as const,
     color: Colors.golf.text,
@@ -816,6 +838,7 @@ const styles = StyleSheet.create({
     color: Colors.golf.primary,
   },
   holeScoreStatus: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 12,
     fontWeight: '600' as const,
     color: Colors.golf.primary,
@@ -825,6 +848,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   holeScoreInfoText: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 16,
     fontWeight: '600' as const,
     color: Colors.golf.textLight,
@@ -840,6 +864,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   playerInfoName: {
+    fontFamily: FontFamily.heading,
     fontSize: 24,
     fontWeight: '700' as const,
     color: Colors.golf.text,
@@ -857,12 +882,14 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   playerInfoStatLabel: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 11,
     fontWeight: '600' as const,
     color: Colors.golf.textLight,
     textTransform: 'uppercase',
   },
   playerInfoStatValue: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 20,
     fontWeight: '700' as const,
     color: Colors.golf.text,
@@ -891,6 +918,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   playerScoreName: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 18,
     fontWeight: '700' as const,
     color: Colors.golf.text,
@@ -900,6 +928,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   playerScoreStat: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 14,
     fontWeight: '600' as const,
     color: Colors.golf.textLight,
@@ -926,6 +955,7 @@ const styles = StyleSheet.create({
     borderWidth: 3,
   },
   holeScoreValueCompact: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 36,
     fontWeight: '700' as const,
     color: Colors.golf.text,
@@ -952,6 +982,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   landscapeBackText: {
+    fontFamily: FontFamily.bodySemi,
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600' as const,

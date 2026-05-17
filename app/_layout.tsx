@@ -11,6 +11,19 @@ import { FreePlayProvider } from "../providers/FreePlayProvider";
 import { PlayerAuthContext } from "../providers/PlayerAuthProvider";
 import { configureGoogleSignIn } from "../services/auth";
 import { verifyMagicLink } from "../services/auth";
+import {
+  useFonts,
+  DMSans_400Regular,
+  DMSans_500Medium,
+  DMSans_600SemiBold,
+  DMSans_700Bold,
+} from "@expo-google-fonts/dm-sans";
+import {
+  Barlow_500Medium,
+  Barlow_600SemiBold,
+  Barlow_700Bold,
+  Barlow_800ExtraBold,
+} from "@expo-google-fonts/barlow";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -42,10 +55,26 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    DMSans_400Regular,
+    DMSans_500Medium,
+    DMSans_600SemiBold,
+    DMSans_700Bold,
+    Barlow_500Medium,
+    Barlow_600SemiBold,
+    Barlow_700Bold,
+    Barlow_800ExtraBold,
+  });
+
   useEffect(() => {
     configureGoogleSignIn();
-    SplashScreen.hideAsync();
   }, []);
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
 
   useEffect(() => {
     const handleDeepLink = async (url: string) => {
@@ -67,18 +96,18 @@ export default function RootLayout() {
       }
     };
 
-    // Handle deep link when app is already open
     const subscription = Linking.addEventListener('url', (event) => {
       handleDeepLink(event.url);
     });
 
-    // Handle deep link that launched the app
     Linking.getInitialURL().then((url) => {
       if (url) handleDeepLink(url);
     });
 
     return () => subscription.remove();
   }, []);
+
+  if (!fontsLoaded) return null;
 
   return (
     <DatabaseProvider database={database}>
