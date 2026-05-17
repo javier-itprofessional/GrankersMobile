@@ -1,8 +1,8 @@
 # Backend TODO — Integración Mobile
 
-> Generado 2026-04-24. Última actualización 2026-04-26.  
+> Generado 2026-04-24. Última actualización 2026-05-17.  
 > Referencia: `docs/todo.md` (lado mobile), `docs/technical-architecture.md`.  
-> Estado mobile: branch `local_database_updates` (v2 cleanup + tests completados).
+> Estado mobile: `main` — refactor estructural + tipografía Barlow/DM Sans completado. Build preview Android funcionando.
 
 ---
 
@@ -511,7 +511,9 @@ Y espera que el response incluya `route_uuid` para confirmarlo:
 
 ### N-4 — Auth refresh: `X-Device-ID` obligatorio
 
-`POST /auth/mobile/refresh/` siempre lleva `X-Device-ID` en headers. Backend debe aceptarlo (no rechazar si no lo esperaba).
+`POST /api/v1/auth/mobile/refresh/` siempre lleva `X-Device-ID` en headers. Backend debe aceptarlo (no rechazar si no lo esperaba).
+
+> **Fix 2026-05-17:** todas las rutas de auth en mobile usaban paths sin prefijo (`/auth/mobile/...`). Corregido a `/api/v1/auth/mobile/...` en `services/auth.ts` y `services/api.ts`.
 
 ---
 
@@ -535,7 +537,7 @@ El doc está desactualizado en varios puntos. Backend debe actualizar antes del 
 
 | Área | Backend | Estado |
 |------|---------|--------|
-| Auth (Google, Magic Link, Refresh, Logout) | ✅ | Funcionando |
+| Auth (Google, Magic Link, Refresh, Logout) | ✅ | ✅ Verificado en build preview 2026-05-17 — URLs corregidas a `/api/v1/` |
 | `GET /api/v1/courses/` con route fields | ✅ shipped 7.1.a | Funcionando |
 | `GET /api/v1/competitions/{group_code}/` | ✅ con session_uuid + scoring_mode | Verificar shapes |
 | `GET /api/v1/competitions/active/` | ✅ con competition_name + event_name | Verificar uuid |
