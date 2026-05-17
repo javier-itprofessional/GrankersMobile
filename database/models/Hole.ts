@@ -9,11 +9,16 @@ export default class Hole extends Model {
   };
 
   @text('route_id') routeId!: string;
-  @field('hole_number') holeNumber!: number;       // 1-18
-  @field('par') par!: number;                      // 3, 4 o 5
-  @field('handicap') handicap!: number;            // índice slope 1-18
+  @field('hole_number') holeNumber!: number;
+  @field('par') par!: number;
+  @field('handicap') handicap!: number;
   @field('distance_meters') distanceMeters!: number | null;
   @field('distance_yards') distanceYards!: number | null;
+  @field('elevation') elevation!: number | null;
+  @field('fairway_width') fairwayWidth!: number | null;
+  @field('fairway_length') fairwayLength!: number | null;
+  @field('fairway_slope') fairwaySlope!: number | null;
+  @field('fairway_slope_percentage') fairwaySlopePercentage!: number | null;
 
   @relation('routes', 'route_id') route!: Route;
 }

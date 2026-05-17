@@ -11,6 +11,12 @@ interface WireHoleData {
   par: number;
   handicap: number;
   distance?: number;
+  distance_yards?: number;
+  elevation?: number;
+  fairway_width?: number;
+  fairway_length?: number;
+  fairway_slope?: number;
+  fairway_slope_percentage?: number;
 }
 
 interface WireRouteData {
@@ -42,6 +48,12 @@ export interface HoleData {
   par: number;
   handicap: number;
   distance_meters?: number;
+  distance_yards?: number;
+  elevation?: number;
+  fairway_width?: number;
+  fairway_length?: number;
+  fairway_slope?: number;
+  fairway_slope_percentage?: number;
 }
 
 export interface RouteData {
@@ -92,6 +104,12 @@ function transformCourse(wire: WireCourseData): CourseData {
         par: h.par,
         handicap: h.handicap,
         distance_meters: h.distance,
+        distance_yards: h.distance_yards,
+        elevation: h.elevation,
+        fairway_width: h.fairway_width,
+        fairway_length: h.fairway_length,
+        fairway_slope: h.fairway_slope,
+        fairway_slope_percentage: h.fairway_slope_percentage,
       })),
     })),
   };
@@ -176,6 +194,12 @@ async function routeRecordToData(routeRecord: Route): Promise<RouteData> {
         par: h.par,
         handicap: h.handicap,
         distance_meters: h.distanceMeters ?? undefined,
+        distance_yards: h.distanceYards ?? undefined,
+        elevation: h.elevation ?? undefined,
+        fairway_width: h.fairwayWidth ?? undefined,
+        fairway_length: h.fairwayLength ?? undefined,
+        fairway_slope: h.fairwaySlope ?? undefined,
+        fairway_slope_percentage: h.fairwaySlopePercentage ?? undefined,
       })),
   };
 }
@@ -296,6 +320,12 @@ export async function persistCourse(courseData: CourseData, routeData: RouteData
         h.par = hole.par;
         h.handicap = hole.handicap;
         h.distanceMeters = hole.distance_meters ?? null;
+        h.distanceYards = hole.distance_yards ?? null;
+        h.elevation = hole.elevation ?? null;
+        h.fairwayWidth = hole.fairway_width ?? null;
+        h.fairwayLength = hole.fairway_length ?? null;
+        h.fairwaySlope = hole.fairway_slope ?? null;
+        h.fairwaySlopePercentage = hole.fairway_slope_percentage ?? null;
       });
     }
   });

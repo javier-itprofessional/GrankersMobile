@@ -4,6 +4,22 @@ import { schemaMigrations, addColumns, createTable, unsafeExecuteSql } from '@no
 
 export default schemaMigrations({
   migrations: [
+    // ─── v9: campos extra de hoyo (elevation, fairway_*)
+    {
+      toVersion: 9,
+      steps: [
+        addColumns({
+          table: 'holes',
+          columns: [
+            { name: 'elevation', type: 'number', isOptional: true },
+            { name: 'fairway_width', type: 'number', isOptional: true },
+            { name: 'fairway_length', type: 'number', isOptional: true },
+            { name: 'fairway_slope', type: 'number', isOptional: true },
+            { name: 'fairway_slope_percentage', type: 'number', isOptional: true },
+          ],
+        }),
+      ],
+    },
     // ─── v8: clubs_cache, user_profile; club_id en courses; external_id en routes
     {
       toVersion: 8,

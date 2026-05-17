@@ -177,7 +177,7 @@ const isTransient = ![...NON_RETRIABLE_PREFIXES].some((p) => reason.startsWith(p
 
 ### I-2 — `GET /api/v1/sync/pull/?since=<unix_ms>` — Shape de respuesta (AMPLIADO)
 
-> **Actualizado 2026-05-17** — Mobile implementó offline cache de clubs, courses, hoyos y perfil de usuario (schema v8). El endpoint debe incluir los nuevos campos.
+> **Actualizado 2026-05-17** — Mobile implementó offline cache de clubs, courses, hoyos y perfil de usuario (schema v8/v9). El endpoint debe incluir los nuevos campos.
 
 Mobile espera ahora el siguiente shape completo:
 
@@ -225,7 +225,13 @@ Mobile espera ahora el siguiente shape completo:
           "gender": "male",
           "total_distance": 6234,
           "holes": [
-            { "number": 1, "par": 4, "handicap": 7, "distance": 378 }
+            {
+              "number": 1, "par": 4, "handicap": 7,
+              "distance": 378, "distance_yards": 413,
+              "elevation": 12.5,
+              "fairway_width": 28.0, "fairway_length": 340.0,
+              "fairway_slope": 2.1, "fairway_slope_percentage": 3.7
+            }
           ]
         }
       ]
@@ -244,11 +250,12 @@ Mobile espera ahora el siguiente shape completo:
 - `courses` incluye los routes y holes embebidos para evitar roundtrips — solo mandar courses que hayan cambiado (o cuyos routes/holes hayan cambiado)
 - `server_time_ms` es **crítico** — mobile lo usa como watermark para la próxima llamada
 
-**Comportamiento en mobile (implementado en schema v8):**
+**Comportamiento en mobile (implementado en schema v8/v9):**
 - Upsert por `external_id` (UUID del backend) en todas las entidades
-- Routes: upsert por `external_id` del route (nuevo campo en v8)
-- Holes: upsert por `route_id + hole_number`
+- Routes: upsert por `external_id` del route (v8)
+- Holes: upsert por `route_id + hole_number`; almacena campos de geometría del hoyo (v9: `elevation`, `fairway_width`, `fairway_length`, `fairway_slope`, `fairway_slope_percentage`)
 - Courses: `listCourses()` lee de BD local primero; solo hace fetch a red si local está vacío
+- Todos los campos de hoyo son opcionales — si backend no los incluye, se almacenan como `null`
 
 **Estado backend:** ⬜ Pendiente implementación — bloqueante para offline mode
 

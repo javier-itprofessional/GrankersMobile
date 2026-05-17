@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export default appSchema({
-  version: 8,
+  version: 9,
   tables: [
     // ─── Rounds ───────────────────────────────────────────────────────────────
     tableSchema({
@@ -150,6 +150,11 @@ export default appSchema({
         { name: 'handicap', type: 'number' },
         { name: 'distance_meters', type: 'number', isOptional: true },
         { name: 'distance_yards', type: 'number', isOptional: true },
+        { name: 'elevation', type: 'number', isOptional: true },
+        { name: 'fairway_width', type: 'number', isOptional: true },
+        { name: 'fairway_length', type: 'number', isOptional: true },
+        { name: 'fairway_slope', type: 'number', isOptional: true },
+        { name: 'fairway_slope_percentage', type: 'number', isOptional: true },
       ],
     }),
     // ─── Tour events cache ────────────────────────────────────────────────────

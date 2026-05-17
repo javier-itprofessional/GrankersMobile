@@ -50,6 +50,12 @@ interface WireHole {
   par: number;
   handicap: number;
   distance?: number;
+  distance_yards?: number;
+  elevation?: number;
+  fairway_width?: number;
+  fairway_length?: number;
+  fairway_slope?: number;
+  fairway_slope_percentage?: number;
 }
 
 interface WireRoute {
@@ -400,6 +406,12 @@ export class SyncEngine {
                   r.par = wh.par;
                   r.handicap = wh.handicap;
                   r.distanceMeters = wh.distance ?? null;
+                  r.distanceYards = wh.distance_yards ?? null;
+                  r.elevation = wh.elevation ?? null;
+                  r.fairwayWidth = wh.fairway_width ?? null;
+                  r.fairwayLength = wh.fairway_length ?? null;
+                  r.fairwaySlope = wh.fairway_slope ?? null;
+                  r.fairwaySlopePercentage = wh.fairway_slope_percentage ?? null;
                 });
               } else {
                 await database.get<Hole>('holes').create((r) => {
@@ -408,6 +420,12 @@ export class SyncEngine {
                   r.par = wh.par;
                   r.handicap = wh.handicap;
                   r.distanceMeters = wh.distance ?? null;
+                  r.distanceYards = wh.distance_yards ?? null;
+                  r.elevation = wh.elevation ?? null;
+                  r.fairwayWidth = wh.fairway_width ?? null;
+                  r.fairwayLength = wh.fairway_length ?? null;
+                  r.fairwaySlope = wh.fairway_slope ?? null;
+                  r.fairwaySlopePercentage = wh.fairway_slope_percentage ?? null;
                 });
               }
             }
