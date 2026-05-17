@@ -158,7 +158,7 @@ function LicenseForm({ federations, onSave, onCancel, initial }: LicenseFormProp
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { session, userProfile, userLicenses, reloadProfile, updateCachedLicenses } = usePlayerAuth();
+  const { session, userProfile, userLicenses, updateCachedProfile, updateCachedLicenses } = usePlayerAuth();
   const [tab, setTab] = useState<Tab>('personal');
   const [saving, setSaving] = useState(false);
 
@@ -207,7 +207,7 @@ export default function ProfileScreen() {
     if (!userProfile?.uuid) return;
     setSaving(true);
     try {
-      await updateProfile(userProfile.uuid, {
+      const updated = await updateProfile(userProfile.uuid, {
         first_name: firstName,
         last_name: lastName,
         phone_number: phone || null,
@@ -215,7 +215,8 @@ export default function ProfileScreen() {
         gender: gender || null,
         language: language || null,
       } as any);
-      await reloadProfile();
+      // Backend response is the source of truth — update cache and context directly
+      await updateCachedProfile(updated);
       Alert.alert('Guardado', 'Perfil actualizado correctamente.');
     } catch {
       Alert.alert('Error', 'No se pudo guardar el perfil.');

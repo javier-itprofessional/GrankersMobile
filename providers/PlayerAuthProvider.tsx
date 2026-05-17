@@ -158,7 +158,17 @@ export const [PlayerAuthContext, usePlayerAuth] = createContextHook(() => {
     }
   }, [applyData]);
 
-  // Optimistic local update for licenses after CRUD — avoids a full refetch
+  // Update profile from the PATCH response — avoids a full refetch
+  const updateCachedProfile = useCallback(async (profile: UserProfile) => {
+    setUserProfile(profile);
+    await ProfileCache.setProfile(profile);
+    const fullName = `${profile.first_name} ${profile.last_name}`.trim();
+    if (fullName) {
+      setSession((prev) => (prev ? { ...prev, name: fullName } : prev));
+    }
+  }, []);
+
+  // Update licenses after CRUD — avoids a full refetch
   const updateCachedLicenses = useCallback(async (licenses: UserLicense[]) => {
     setUserLicenses(licenses);
     await ProfileCache.setLicenses(licenses);
@@ -190,6 +200,7 @@ export const [PlayerAuthContext, usePlayerAuth] = createContextHook(() => {
     isAuthenticated,
     reloadSession,
     reloadProfile,
+    updateCachedProfile,
     updateCachedLicenses,
     clearSession,
   };
