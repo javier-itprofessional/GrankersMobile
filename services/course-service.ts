@@ -122,7 +122,7 @@ function transformCourse(wire: WireCourseData): CourseData {
 export async function listCourses(): Promise<CourseData[]> {
   const localCourses = await database.get<Course>('courses').query().fetch();
   if (localCourses.length > 0) {
-    return Promise.all(localCourses.map(courseRecordToData));
+    return batchCourseRecordsToData(localCourses);
   }
   // First-run fallback: fetch all and cache
   const wire = await apiRequest<WireCourseData[]>('/api/v1/courses/');
@@ -133,6 +133,70 @@ export async function listCourses(): Promise<CourseData[]> {
     }
   }
   return courses;
+}
+
+// 3 queries total instead of N+1+M: courses → all routes → all holes, assembled in memory.
+async function batchCourseRecordsToData(localCourses: Course[]): Promise<CourseData[]> {
+  const courseIds = localCourses.map((c) => c.id);
+
+  const allRoutes = await database.get<Route>('routes')
+    .query(Q.where('course_id', Q.oneOf(courseIds))).fetch();
+
+  const routeIds = allRoutes.map((r) => r.id);
+  const allHoles = routeIds.length > 0
+    ? await database.get<Hole>('holes').query(Q.where('route_id', Q.oneOf(routeIds))).fetch()
+    : [];
+
+  const routesByCourseId = new Map<string, Route[]>();
+  for (const r of allRoutes) {
+    if (!routesByCourseId.has(r.courseId)) routesByCourseId.set(r.courseId, []);
+    routesByCourseId.get(r.courseId)!.push(r);
+  }
+
+  const holesByRouteId = new Map<string, Hole[]>();
+  for (const h of allHoles) {
+    if (!holesByRouteId.has(h.routeId)) holesByRouteId.set(h.routeId, []);
+    holesByRouteId.get(h.routeId)!.push(h);
+  }
+
+  return localCourses.map((courseRecord) => {
+    const routes = routesByCourseId.get(courseRecord.id) ?? [];
+    return {
+      id: courseRecord.externalId,
+      name: courseRecord.name,
+      clubId: courseRecord.clubId ?? undefined,
+      city: courseRecord.city ?? undefined,
+      country: courseRecord.country ?? undefined,
+      routes: routes.map((routeRecord) => {
+        const holes = (holesByRouteId.get(routeRecord.id) ?? [])
+          .sort((a, b) => a.holeNumber - b.holeNumber);
+        return {
+          id: routeRecord.courseExternalId,
+          externalId: routeRecord.externalId ?? undefined,
+          name: routeRecord.name,
+          num_holes: routeRecord.numHoles,
+          par_total: routeRecord.parTotal,
+          slope: routeRecord.slope ?? undefined,
+          course_rating: routeRecord.courseRating ?? undefined,
+          teeColor: routeRecord.teeColor ?? undefined,
+          gender: routeRecord.gender ?? undefined,
+          totalDistance: routeRecord.totalDistance ?? undefined,
+          holes: holes.map((h) => ({
+            hole_number: h.holeNumber,
+            par: h.par,
+            handicap: h.handicap,
+            distance_meters: h.distanceMeters ?? undefined,
+            distance_yards: h.distanceYards ?? undefined,
+            elevation: h.elevation ?? undefined,
+            fairway_width: h.fairwayWidth ?? undefined,
+            fairway_length: h.fairwayLength ?? undefined,
+            fairway_slope: h.fairwaySlope ?? undefined,
+            fairway_slope_percentage: h.fairwaySlopePercentage ?? undefined,
+          })),
+        };
+      }),
+    };
+  });
 }
 
 // Returns route data for a specific course+route, using local cache when fresh.
