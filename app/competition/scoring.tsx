@@ -5,6 +5,7 @@ import { Minus, Plus, ArrowLeft, LogOut, ChevronRight } from 'lucide-react-nativ
 import Colors from '../../constants/colors';
 import { useCompetition } from '../../providers/CompetitionProvider';
 import ConnectionStatus from '../../components/ConnectionStatus';
+import HoleInfoPanel from '../../components/HoleInfoPanel';
 
 export default function CompetitionScoringScreen() {
   const router = useRouter();
@@ -266,6 +267,12 @@ export default function CompetitionScoringScreen() {
           )}
         </View>
       </View>
+
+      <HoleInfoPanel
+        courseName={competition.courseName ?? ''}
+        routeName={competition.routeName ?? ''}
+        holeNumber={currentHole}
+      />
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         {sortedPlayers.map((player) => {

@@ -7,6 +7,7 @@ import Colors from '../../constants/colors';
 import { useCompetition } from '../../providers/CompetitionProvider';
 import { useFreePlay } from '../../providers/FreePlayProvider';
 import ConnectionStatus from '../../components/ConnectionStatus';
+import HoleInfoPanel from '../../components/HoleInfoPanel';
 
 export default function ScoringScreen() {
   const router = useRouter();
@@ -44,7 +45,7 @@ export default function ScoringScreen() {
     updateCurrentScreen,
   } = useFreePlay();
 
-  const { gameName, groupName } = useFreePlay();
+  const { gameName, groupName, courseName: freeCourseName, routeName: freeRouteName } = useFreePlay();
 
   const competition = isCompetitionMode ? competitionData : (isFreePlayMode ? {
     groupCode: '',
@@ -63,6 +64,8 @@ export default function ScoringScreen() {
   const goToPreviousHole = isCompetitionMode ? compGoToPreviousHole : freeGoToPreviousHole;
   const isHoleSaved = isCompetitionMode ? compIsHoleSaved : freeIsHoleSaved;
   const resetGame = isCompetitionMode ? resetCompetition : resetFreePlay;
+  const panelCourseName = isCompetitionMode ? (competitionData?.courseName ?? '') : freeCourseName;
+  const panelRouteName = isCompetitionMode ? (competitionData?.routeName ?? '') : freeRouteName;
   const [editMode, setEditMode] = useState<boolean>(false);
 
   const marcandoPlayerId = useMemo(() => {
@@ -373,6 +376,12 @@ export default function ScoringScreen() {
           )}
         </View>
       </View>
+
+      <HoleInfoPanel
+        courseName={panelCourseName}
+        routeName={panelRouteName}
+        holeNumber={currentHole}
+      />
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} contentInset={{ bottom: 80 }}>
         <View style={styles.playersContainer}>
