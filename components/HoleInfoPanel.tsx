@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { ChevronDown, ChevronUp, Info } from 'lucide-react-native';
 import { getCourseRouteData, type RouteData } from '@/services/course-service';
 import Colors from '@/constants/colors';
+import { FontFamily } from '@/constants/Typography';
+
 
 interface Props {
   courseName: string;
@@ -118,6 +120,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   triggerText: {
+    fontFamily: FontFamily.bodySemi,
     flex: 1,
     fontSize: 12,
     fontWeight: '600',
@@ -138,10 +141,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   rowLabel: {
+    fontFamily: FontFamily.body,
     fontSize: 13,
     color: 'rgba(255,255,255,0.65)',
   },
   rowValue: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 13,
     fontWeight: '600',
     color: Colors.golf.textDark,

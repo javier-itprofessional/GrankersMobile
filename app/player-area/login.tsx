@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Mail, ChevronRight, CheckCircle } from 'lucide-react-native';
 import Colors from '@/constants/colors';
+import { FontFamily } from '@/constants/Typography';
 import { usePlayerAuth } from '@/providers/PlayerAuthProvider';
 import { loginWithGoogle, requestMagicLink } from '@/services/auth';
 
@@ -199,12 +200,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   successTitle: {
+    fontFamily: FontFamily.heading,
     fontSize: 26,
     fontWeight: '700' as const,
     color: Colors.golf.text,
     textAlign: 'center',
   },
   successSubtitle: {
+    fontFamily: FontFamily.body,
     fontSize: 15,
     fontWeight: '400' as const,
     color: Colors.golf.textLight,
@@ -212,10 +215,12 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   emailHighlight: {
+    fontFamily: FontFamily.bodySemi,
     fontWeight: '600' as const,
     color: Colors.golf.text,
   },
   successHint: {
+    fontFamily: FontFamily.body,
     fontSize: 13,
     fontWeight: '400' as const,
     color: Colors.golf.textLight,
@@ -229,6 +234,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   resendButtonText: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 14,
     fontWeight: '600' as const,
     color: Colors.golf.primary,
@@ -253,11 +259,13 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   logoText: {
+    fontFamily: FontFamily.headingBold,
     fontSize: 36,
     fontWeight: '800' as const,
     color: '#FFFFFF',
   },
   welcomeTitle: {
+    fontFamily: FontFamily.heading,
     fontSize: 28,
     fontWeight: '700' as const,
     color: Colors.golf.text,
@@ -265,6 +273,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   welcomeSubtitle: {
+    fontFamily: FontFamily.body,
     fontSize: 15,
     fontWeight: '400' as const,
     color: Colors.golf.textLight,
@@ -300,11 +309,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   googleIconText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 16,
     fontWeight: '700' as const,
     color: '#FFFFFF',
   },
   googleButtonText: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 15,
     fontWeight: '600' as const,
     color: Colors.golf.text,
@@ -320,6 +331,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.golf.border,
   },
   dividerText: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 13,
     fontWeight: '500' as const,
     color: Colors.golf.textLight,
@@ -339,6 +351,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   textInput: {
+    fontFamily: FontFamily.body,
     flex: 1,
     fontSize: 15,
     fontWeight: '400' as const,
@@ -363,6 +376,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   emailLoginButtonText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 16,
     fontWeight: '700' as const,
     color: '#FFFFFF',
@@ -377,11 +391,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   registerQuestion: {
+    fontFamily: FontFamily.body,
     fontSize: 14,
     fontWeight: '400' as const,
     color: Colors.golf.textLight,
   },
   registerAction: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 14,
     fontWeight: '700' as const,
     color: Colors.golf.primary,
