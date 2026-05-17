@@ -1,6 +1,5 @@
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Image,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator,
 } from 'react-native';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,11 +7,10 @@ import {
   BarChart3, Settings, ChevronRight, User, Calendar, LogOut,
   Award, Trophy, Users, FileText,
 } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import Colors from '@/constants/colors';
 import { FontFamily, FontSize } from '@/constants/Typography';
 import { usePlayerAuth } from '@/providers/PlayerAuthProvider';
-import { getDashboardStats, getUpcomingEvents, DashboardStats, UpcomingEvent } from '@/services/user-service';
 
 interface MenuItemProps {
   icon: React.ReactNode;
@@ -72,10 +70,9 @@ function statusLabel(status: string): string {
 export default function PlayerAreaScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { session, userProfile, isLoading, isAuthenticated, clearSession } = usePlayerAuth();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [events, setEvents] = useState<UpcomingEvent[]>([]);
-  const [dataLoading, setDataLoading] = useState(false);
+  const { session, userProfile, dashboardStats, upcomingEvents, isLoading, isAuthenticated, clearSession } = usePlayerAuth();
+  const stats = dashboardStats;
+  const events = upcomingEvents.slice(0, 5);
 
   useFocusEffect(
     useCallback(() => {
@@ -84,18 +81,6 @@ export default function PlayerAreaScreen() {
       }
     }, [isLoading, isAuthenticated, router])
   );
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    setDataLoading(true);
-    Promise.all([getDashboardStats(), getUpcomingEvents()])
-      .then(([s, e]) => {
-        setStats(s);
-        setEvents(e.slice(0, 5));
-      })
-      .catch(() => {})
-      .finally(() => setDataLoading(false));
-  }, [isAuthenticated]);
 
   const handleLogout = useCallback(async () => {
     await clearSession();
@@ -157,11 +142,9 @@ export default function PlayerAreaScreen() {
         </TouchableOpacity>
 
         {/* Stats row */}
-        {(stats || dataLoading) && (
+        {stats && (
           <View style={styles.statsRow}>
-            {dataLoading && !stats ? (
-              <ActivityIndicator color={Colors.golf.primary} style={{ flex: 1 }} />
-            ) : stats ? (
+            {stats ? (
               <>
                 <StatCard
                   value={stats.events_count}

@@ -3,11 +3,12 @@ import {
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Calendar, MapPin, Trophy, Users } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { FontFamily, FontSize } from '@/constants/Typography';
-import { getUpcomingEvents, UpcomingEvent } from '@/services/user-service';
+import { usePlayerAuth } from '@/providers/PlayerAuthProvider';
+import { UpcomingEvent } from '@/services/user-service';
 
 type Filter = 'all' | 'confirmed' | 'pending';
 
@@ -52,16 +53,10 @@ function paymentLabel(status: string): string {
 export default function ScorecardScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [events, setEvents] = useState<UpcomingEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { upcomingEvents, isLoading } = usePlayerAuth();
+  const events = upcomingEvents;
+  const loading = isLoading;
   const [filter, setFilter] = useState<Filter>('all');
-
-  useEffect(() => {
-    getUpcomingEvents()
-      .then(setEvents)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
 
   const filtered = events.filter((e) => {
     if (filter === 'all') return true;

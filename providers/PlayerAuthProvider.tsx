@@ -1,8 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import createContextHook from '@nkzw/create-context-hook';
 import { AuthStorage } from '@/services/auth-storage';
 import { logout as authLogout } from '@/services/auth';
-import { getMyProfile, UserProfile } from '@/services/user-service';
+import {
+  getMyProfile, getDashboardStats, getUpcomingEvents, getMyLicenses,
+  UserProfile, UserLicense, DashboardStats, UpcomingEvent,
+} from '@/services/user-service';
+import { ProfileCache } from '@/services/profile-cache';
 
 export interface PlayerSession {
   id: string;
@@ -41,70 +45,136 @@ function sessionFromAccessToken(token: string): PlayerSession | null {
   };
 }
 
+// Fetch all player data from the API and persist to cache
+async function fetchAndCache(): Promise<{
+  profile: UserProfile;
+  stats: DashboardStats;
+  events: UpcomingEvent[];
+  licenses: UserLicense[];
+}> {
+  const [profile, stats, events, licenses] = await Promise.all([
+    getMyProfile(),
+    getDashboardStats(),
+    getUpcomingEvents(),
+    getMyLicenses(),
+  ]);
+
+  await Promise.all([
+    ProfileCache.setProfile(profile),
+    ProfileCache.setStats(stats),
+    ProfileCache.setEvents(events),
+    ProfileCache.setLicenses(licenses),
+    ProfileCache.touch(),
+  ]);
+
+  return { profile, stats, events, licenses };
+}
+
 export const [PlayerAuthContext, usePlayerAuth] = createContextHook(() => {
   const [session, setSession] = useState<PlayerSession | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userLicenses, setUserLicenses] = useState<UserLicense[]>([]);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  // Prevents double background-refresh when the effect fires twice in StrictMode
+  const refreshing = useRef(false);
 
-  const loadSession = useCallback(async () => {
-    try {
-      const accessToken = await AuthStorage.getAccessToken();
-      if (!accessToken) {
-        setSession(null);
-        setUserProfile(null);
-        return;
-      }
-      const parsed = sessionFromAccessToken(accessToken);
-      setSession(parsed);
-      if (parsed) {
-        try {
-          const profile = await getMyProfile();
-          setUserProfile(profile);
-          // Enrich session name from full profile
-          const fullName = `${profile.first_name} ${profile.last_name}`.trim();
-          if (fullName) {
-            setSession((prev) => prev ? { ...prev, name: fullName } : prev);
-          }
-        } catch {
-          // Profile fetch failing doesn't invalidate the session
-        }
-      }
-    } catch (error) {
-      console.error('[PlayerAuth] Error loading session:', error);
-      setSession(null);
-      setUserProfile(null);
+  const applyData = useCallback((data: {
+    profile: UserProfile;
+    stats: DashboardStats;
+    events: UpcomingEvent[];
+    licenses: UserLicense[];
+  }) => {
+    const fullName = `${data.profile.first_name} ${data.profile.last_name}`.trim();
+    setUserProfile(data.profile);
+    setUserLicenses(data.licenses);
+    setDashboardStats(data.stats);
+    setUpcomingEvents(data.events);
+    if (fullName) {
+      setSession((prev) => (prev ? { ...prev, name: fullName } : prev));
     }
   }, []);
+
+  const loadSession = useCallback(async () => {
+    const accessToken = await AuthStorage.getAccessToken();
+    if (!accessToken) {
+      setSession(null);
+      return;
+    }
+
+    const parsed = sessionFromAccessToken(accessToken);
+    setSession(parsed);
+    if (!parsed) return;
+
+    // 1. Load from cache immediately so UI renders without a spinner
+    const [cachedProfile, cachedStats, cachedEvents, cachedLicenses] = await Promise.all([
+      ProfileCache.getProfile(),
+      ProfileCache.getStats(),
+      ProfileCache.getEvents(),
+      ProfileCache.getLicenses(),
+    ]);
+
+    const hasCachedData = cachedProfile && cachedStats && cachedEvents && cachedLicenses;
+    if (hasCachedData) {
+      applyData({
+        profile: cachedProfile,
+        stats: cachedStats,
+        events: cachedEvents,
+        licenses: cachedLicenses,
+      });
+    }
+
+    // 2. Background refresh if cache is stale or missing
+    const stale = await ProfileCache.isStale();
+    if ((stale || !hasCachedData) && !refreshing.current) {
+      refreshing.current = true;
+      fetchAndCache()
+        .then(applyData)
+        .catch(() => {})
+        .finally(() => { refreshing.current = false; });
+    }
+  }, [applyData]);
 
   useEffect(() => {
     loadSession().finally(() => setIsLoading(false));
   }, [loadSession]);
 
+  // Called by login screens after tokens are stored — forces a fresh API fetch
   const reloadSession = useCallback(async () => {
     await loadSession();
   }, [loadSession]);
 
+  // Force a fresh fetch from API (e.g. after profile edit)
   const reloadProfile = useCallback(async () => {
+    if (refreshing.current) return;
+    refreshing.current = true;
     try {
-      const profile = await getMyProfile();
-      setUserProfile(profile);
-      const fullName = `${profile.first_name} ${profile.last_name}`.trim();
-      if (fullName) {
-        setSession((prev) => prev ? { ...prev, name: fullName } : prev);
-      }
+      const data = await fetchAndCache();
+      applyData(data);
     } catch {
-      // Ignore — stale profile is better than crash
+    } finally {
+      refreshing.current = false;
     }
+  }, [applyData]);
+
+  // Optimistic local update for licenses after CRUD — avoids a full refetch
+  const updateCachedLicenses = useCallback(async (licenses: UserLicense[]) => {
+    setUserLicenses(licenses);
+    await ProfileCache.setLicenses(licenses);
   }, []);
 
   const clearSession = useCallback(async () => {
     try {
       await authLogout();
-    } catch (error) {
-      console.error('[PlayerAuth] Error during logout:', error);
-    } finally {
+    } catch {}
+    finally {
+      await ProfileCache.clear();
       setSession(null);
       setUserProfile(null);
+      setUserLicenses([]);
+      setDashboardStats(null);
+      setUpcomingEvents([]);
     }
   }, []);
 
@@ -113,10 +183,14 @@ export const [PlayerAuthContext, usePlayerAuth] = createContextHook(() => {
   return {
     session,
     userProfile,
+    userLicenses,
+    dashboardStats,
+    upcomingEvents,
     isLoading,
     isAuthenticated,
     reloadSession,
     reloadProfile,
+    updateCachedLicenses,
     clearSession,
   };
 });

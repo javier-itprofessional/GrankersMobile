@@ -10,7 +10,7 @@ import Colors from '@/constants/colors';
 import { FontFamily, FontSize } from '@/constants/Typography';
 import { usePlayerAuth } from '@/providers/PlayerAuthProvider';
 import {
-  updateProfile, getMyLicenses, createLicense, updateLicense, deleteLicense,
+  updateProfile, createLicense, updateLicense, deleteLicense,
   getGolfFederations, UserLicense, GolfFederation,
 } from '@/services/user-service';
 
@@ -158,7 +158,7 @@ function LicenseForm({ federations, onSave, onCancel, initial }: LicenseFormProp
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { session, userProfile, reloadProfile } = usePlayerAuth();
+  const { session, userProfile, userLicenses, reloadProfile, updateCachedLicenses } = usePlayerAuth();
   const [tab, setTab] = useState<Tab>('personal');
   const [saving, setSaving] = useState(false);
 
@@ -173,9 +173,8 @@ export default function ProfileScreen() {
   const [language, setLanguage] = useState(userProfile?.language ?? '');
 
   // Golf tab
-  const [licenses, setLicenses] = useState<UserLicense[]>([]);
   const [federations, setFederations] = useState<GolfFederation[]>([]);
-  const [licenseLoading, setLicenseLoading] = useState(false);
+  const [fedLoading, setFedLoading] = useState(false);
   const [showLicenseForm, setShowLicenseForm] = useState(false);
   const [editingLicense, setEditingLicense] = useState<UserLicense | null>(null);
 
@@ -190,19 +189,19 @@ export default function ProfileScreen() {
     }
   }, [userProfile]);
 
-  const loadGolfData = useCallback(async () => {
-    setLicenseLoading(true);
+  const loadFederations = useCallback(async () => {
+    if (federations.length > 0) return;
+    setFedLoading(true);
     try {
-      const [lics, feds] = await Promise.all([getMyLicenses(), getGolfFederations()]);
-      setLicenses(lics);
+      const feds = await getGolfFederations();
       setFederations(feds);
     } catch {}
-    finally { setLicenseLoading(false); }
-  }, []);
+    finally { setFedLoading(false); }
+  }, [federations.length]);
 
   useEffect(() => {
-    if (tab === 'golf') loadGolfData();
-  }, [tab, loadGolfData]);
+    if (tab === 'golf') loadFederations();
+  }, [tab, loadFederations]);
 
   const handleSavePersonal = async () => {
     if (!userProfile?.uuid) return;
@@ -228,7 +227,7 @@ export default function ProfileScreen() {
   const handleCreateLicense = async (data: { license_number: string; golf_federation_uuid: string; handicap: number | null }) => {
     try {
       const lic = await createLicense(data);
-      setLicenses((prev) => [...prev, lic]);
+      await updateCachedLicenses([...userLicenses, lic]);
       setShowLicenseForm(false);
     } catch {
       Alert.alert('Error', 'No se pudo crear la licencia.');
@@ -239,7 +238,7 @@ export default function ProfileScreen() {
     if (!editingLicense) return;
     try {
       const updated = await updateLicense(editingLicense.uuid, data);
-      setLicenses((prev) => prev.map((l) => l.uuid === updated.uuid ? updated : l));
+      await updateCachedLicenses(userLicenses.map((l) => l.uuid === updated.uuid ? updated : l));
       setEditingLicense(null);
     } catch {
       Alert.alert('Error', 'No se pudo actualizar la licencia.');
@@ -257,7 +256,7 @@ export default function ProfileScreen() {
           onPress: async () => {
             try {
               await deleteLicense(lic.uuid);
-              setLicenses((prev) => prev.filter((l) => l.uuid !== lic.uuid));
+              await updateCachedLicenses(userLicenses.filter((l) => l.uuid !== lic.uuid));
             } catch {
               Alert.alert('Error', 'No se pudo eliminar la licencia.');
             }
@@ -396,12 +395,12 @@ export default function ProfileScreen() {
                 </TouchableOpacity>
               </View>
 
-              {licenseLoading ? (
+              {fedLoading ? (
                 <ActivityIndicator color={Colors.golf.primary} style={{ marginVertical: 16 }} />
-              ) : licenses.length === 0 ? (
+              ) : userLicenses.length === 0 ? (
                 <Text style={styles.emptyText}>No tienes licencias registradas.</Text>
               ) : (
-                licenses.map((lic, idx) => (
+                userLicenses.map((lic, idx) => (
                   <View key={lic.uuid}>
                     {idx > 0 && <View style={styles.separator} />}
                     <View style={styles.licenseRow}>
