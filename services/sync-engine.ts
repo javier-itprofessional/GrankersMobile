@@ -1,6 +1,6 @@
 import { AppState } from 'react-native';
 import { Q } from '@nozbe/watermelondb';
-import { database, ActionLog, TourEvent, PlayerCache } from '@/database';
+import { database, ActionLog, TourEvent, PlayerCache, ClubCache, UserProfile, Course, Route, Hole } from '@/database';
 import type { ActionType, ActionPayload } from '@/database/models/ActionLog';
 import { apiRequest } from './api';
 import { subscribeToConnectionChanges, getAppConfig, setAppConfig } from '@/lib/offline-sync';
@@ -34,7 +34,62 @@ const PULL_INTERVAL_MS = 5 * 60 * 1_000;  // 5 minutes
 
 // ─── Pull types ───────────────────────────────────────────────────────────────
 
+interface WireClub {
+  id: string;
+  name: string;
+  city?: string;
+  country?: string;
+  address?: string;
+  phone?: string;
+  website?: string;
+  logo_url?: string | null;
+}
+
+interface WireHole {
+  number: number;
+  par: number;
+  handicap: number;
+  distance?: number;
+}
+
+interface WireRoute {
+  id: string;
+  name: string;
+  num_holes: number;
+  par_total: number;
+  slope?: number;
+  course_rating?: number;
+  tee_color?: string;
+  gender?: string;
+  total_distance?: number;
+  holes: WireHole[];
+}
+
+interface WireCourse {
+  id: string;
+  name: string;
+  club_id?: string;
+  city?: string;
+  country?: string;
+  routes: WireRoute[];
+}
+
+interface WireUserProfile {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone?: string;
+  handicap_index?: number;
+  avatar_url?: string | null;
+  home_club_id?: string | null;
+  license_number?: string;
+}
+
 interface WirePullResponse {
+  user_profile?: WireUserProfile;
+  clubs?: WireClub[];
+  courses?: WireCourse[];
   tour_events?: Array<{
     id: string;
     competition_name: string;
@@ -211,6 +266,155 @@ export class SyncEngine {
       const data = await apiRequest<WirePullResponse>(url);
 
       await database.write(async () => {
+        const now = Date.now();
+
+        // ── user_profile ─────────────────────────────────────────────────────
+        if (data.user_profile) {
+          const p = data.user_profile;
+          const existing = await database.get<UserProfile>('user_profile')
+            .query(Q.where('external_id', p.id)).fetch();
+          if (existing.length > 0) {
+            await existing[0].update((r) => {
+              r.firstName = p.first_name;
+              r.lastName = p.last_name;
+              r.email = p.email;
+              r.phone = p.phone ?? null;
+              r.handicapIndex = p.handicap_index ?? null;
+              r.avatarUrl = p.avatar_url ?? null;
+              r.homeClubId = p.home_club_id ?? null;
+              r.licenseNumber = p.license_number ?? null;
+              r.syncedAt = now;
+            });
+          } else {
+            await database.get<UserProfile>('user_profile').create((r) => {
+              r.externalId = p.id;
+              r.firstName = p.first_name;
+              r.lastName = p.last_name;
+              r.email = p.email;
+              r.phone = p.phone ?? null;
+              r.handicapIndex = p.handicap_index ?? null;
+              r.avatarUrl = p.avatar_url ?? null;
+              r.homeClubId = p.home_club_id ?? null;
+              r.licenseNumber = p.license_number ?? null;
+              r.syncedAt = now;
+            });
+          }
+        }
+
+        // ── clubs ─────────────────────────────────────────────────────────────
+        for (const c of data.clubs ?? []) {
+          const existing = await database.get<ClubCache>('clubs_cache')
+            .query(Q.where('external_id', c.id)).fetch();
+          if (existing.length > 0) {
+            await existing[0].update((r) => {
+              r.name = c.name;
+              r.city = c.city ?? null;
+              r.country = c.country ?? null;
+              r.address = c.address ?? null;
+              r.phone = c.phone ?? null;
+              r.website = c.website ?? null;
+              r.logoUrl = c.logo_url ?? null;
+              r.syncedAt = now;
+            });
+          } else {
+            await database.get<ClubCache>('clubs_cache').create((r) => {
+              r.externalId = c.id;
+              r.name = c.name;
+              r.city = c.city ?? null;
+              r.country = c.country ?? null;
+              r.address = c.address ?? null;
+              r.phone = c.phone ?? null;
+              r.website = c.website ?? null;
+              r.logoUrl = c.logo_url ?? null;
+              r.syncedAt = now;
+            });
+          }
+        }
+
+        // ── courses + routes + holes ──────────────────────────────────────────
+        for (const wc of data.courses ?? []) {
+          let courseRecord: Course;
+          const existingCourses = await database.get<Course>('courses')
+            .query(Q.where('external_id', wc.id)).fetch();
+          if (existingCourses.length > 0) {
+            courseRecord = existingCourses[0];
+            await courseRecord.update((r) => {
+              r.name = wc.name;
+              r.clubId = wc.club_id ?? null;
+              r.city = wc.city ?? null;
+              r.country = wc.country ?? null;
+              r.syncedAt = now;
+            });
+          } else {
+            courseRecord = await database.get<Course>('courses').create((r) => {
+              r.externalId = wc.id;
+              r.name = wc.name;
+              r.clubId = wc.club_id ?? null;
+              r.city = wc.city ?? null;
+              r.country = wc.country ?? null;
+              r.syncedAt = now;
+            });
+          }
+
+          for (const wr of wc.routes) {
+            let routeRecord: Route;
+            // Upsert por external_id del backend cuando está disponible
+            const existingRoutes = await database.get<Route>('routes')
+              .query(Q.and(Q.where('course_id', courseRecord.id), Q.where('external_id', wr.id))).fetch();
+            if (existingRoutes.length > 0) {
+              routeRecord = existingRoutes[0];
+              await routeRecord.update((r) => {
+                r.name = wr.name;
+                r.numHoles = wr.num_holes;
+                r.parTotal = wr.par_total;
+                r.slope = wr.slope ?? null;
+                r.courseRating = wr.course_rating ?? null;
+                r.teeColor = wr.tee_color ?? null;
+                r.gender = wr.gender ?? null;
+                r.totalDistance = wr.total_distance ?? null;
+                r.syncedAt = now;
+              });
+            } else {
+              routeRecord = await database.get<Route>('routes').create((r) => {
+                r.externalId = wr.id;
+                r.courseId = courseRecord.id;
+                r.courseExternalId = wc.id;
+                r.name = wr.name;
+                r.numHoles = wr.num_holes;
+                r.parTotal = wr.par_total;
+                r.slope = wr.slope ?? null;
+                r.courseRating = wr.course_rating ?? null;
+                r.teeColor = wr.tee_color ?? null;
+                r.gender = wr.gender ?? null;
+                r.totalDistance = wr.total_distance ?? null;
+                r.syncedAt = now;
+              });
+            }
+
+            // Upsert hoyos por route_id + hole_number
+            for (const wh of wr.holes) {
+              const existingHoles = await database.get<Hole>('holes')
+                .query(Q.and(Q.where('route_id', routeRecord.id), Q.where('hole_number', wh.number))).fetch();
+              if (existingHoles.length > 0) {
+                await existingHoles[0].update((r) => {
+                  r.par = wh.par;
+                  r.handicap = wh.handicap;
+                  r.distanceMeters = wh.distance ?? null;
+                });
+              } else {
+                await database.get<Hole>('holes').create((r) => {
+                  r.routeId = routeRecord.id;
+                  r.holeNumber = wh.number;
+                  r.par = wh.par;
+                  r.handicap = wh.handicap;
+                  r.distanceMeters = wh.distance ?? null;
+                });
+              }
+            }
+          }
+        }
+
+        // ── players_cache ─────────────────────────────────────────────────────
         for (const p of data.players_cache ?? []) {
           const existing = await database.get<PlayerCache>('players_cache')
             .query(Q.where('external_id', p.external_id)).fetch();
@@ -221,7 +425,7 @@ export class SyncEngine {
               r.license = p.license ?? null;
               r.handicapIndex = p.handicap_index ?? null;
               r.avatarUrl = p.avatar_url ?? null;
-              r.syncedAt = Date.now();
+              r.syncedAt = now;
             });
           } else {
             await database.get<PlayerCache>('players_cache').create((r) => {
@@ -231,11 +435,12 @@ export class SyncEngine {
               r.license = p.license ?? null;
               r.handicapIndex = p.handicap_index ?? null;
               r.avatarUrl = p.avatar_url ?? null;
-              r.syncedAt = Date.now();
+              r.syncedAt = now;
             });
           }
         }
 
+        // ── tour_events ───────────────────────────────────────────────────────
         for (const e of data.tour_events ?? []) {
           const existing = await database.get<TourEvent>('tour_events')
             .query(Q.where('external_id', e.id)).fetch();
@@ -250,7 +455,7 @@ export class SyncEngine {
               r.groupCode = e.group_code ?? null;
               r.courseName = e.course_name ?? null;
               r.routeName = e.route_name ?? null;
-              r.syncedAt = Date.now();
+              r.syncedAt = now;
             });
           } else {
             await database.get<TourEvent>('tour_events').create((r) => {
@@ -264,7 +469,7 @@ export class SyncEngine {
               r.groupCode = e.group_code ?? null;
               r.courseName = e.course_name ?? null;
               r.routeName = e.route_name ?? null;
-              r.syncedAt = Date.now();
+              r.syncedAt = now;
             });
           }
         }

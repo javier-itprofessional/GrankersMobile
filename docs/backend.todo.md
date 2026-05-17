@@ -175,7 +175,86 @@ const isTransient = ![...NON_RETRIABLE_PREFIXES].some((p) => reason.startsWith(p
 
 ---
 
-### I-2 — `GET /api/v1/sync/pull/?since=<unix_ms>` — Shape de respuesta
+### I-2 — `GET /api/v1/sync/pull/?since=<unix_ms>` — Shape de respuesta (AMPLIADO)
+
+> **Actualizado 2026-05-17** — Mobile implementó offline cache de clubs, courses, hoyos y perfil de usuario (schema v8). El endpoint debe incluir los nuevos campos.
+
+Mobile espera ahora el siguiente shape completo:
+
+```json
+{
+  "user_profile": {
+    "id": "<uuid>",
+    "first_name": "Alice",
+    "last_name": "Doe",
+    "email": "alice@grankers.com",
+    "phone": "+34600000000",
+    "handicap_index": 12.5,
+    "avatar_url": "https://cdn.grankers.com/avatars/alice.jpg",
+    "home_club_id": "<club-uuid>",
+    "license_number": "MAD-12345"
+  },
+  "clubs": [
+    {
+      "id": "<uuid>",
+      "name": "Club de Golf La Moraleja",
+      "city": "Madrid",
+      "country": "ESP",
+      "address": "Calle del Golf 1",
+      "phone": "+34911234567",
+      "website": "https://lamoraleja.com",
+      "logo_url": "https://cdn.grankers.com/clubs/logo.png"
+    }
+  ],
+  "courses": [
+    {
+      "id": "<uuid>",
+      "name": "Course A",
+      "club_id": "<club-uuid>",
+      "city": "Madrid",
+      "country": "ESP",
+      "routes": [
+        {
+          "id": "<route-uuid>",
+          "name": "Black (Male)",
+          "num_holes": 18,
+          "par_total": 72,
+          "slope": 133,
+          "course_rating": 73.4,
+          "tee_color": "black",
+          "gender": "male",
+          "total_distance": 6234,
+          "holes": [
+            { "number": 1, "par": 4, "handicap": 7, "distance": 378 }
+          ]
+        }
+      ]
+    }
+  ],
+  "tour_events": [...],
+  "players_cache": [...],
+  "server_time_ms": 1745234567890
+}
+```
+
+**Reglas del endpoint:**
+- Solo devolver registros con `updated_at > since` (filtrado por watermark en backend)
+- Si no hay cambios en un array, devolver `[]` — **no omitir la clave**
+- `user_profile` es el perfil del usuario autenticado en la petición — devolver siempre si ha cambiado, `null` u omitir si no hay cambios
+- `courses` incluye los routes y holes embebidos para evitar roundtrips — solo mandar courses que hayan cambiado (o cuyos routes/holes hayan cambiado)
+- `server_time_ms` es **crítico** — mobile lo usa como watermark para la próxima llamada
+
+**Comportamiento en mobile (implementado en schema v8):**
+- Upsert por `external_id` (UUID del backend) en todas las entidades
+- Routes: upsert por `external_id` del route (nuevo campo en v8)
+- Holes: upsert por `route_id + hole_number`
+- Courses: `listCourses()` lee de BD local primero; solo hace fetch a red si local está vacío
+
+**Estado backend:** ⬜ Pendiente implementación — bloqueante para offline mode
+
+---
+
+### I-2-old — `GET /api/v1/sync/pull/?since=<unix_ms>` — Shape original
 
 Mobile consume este endpoint cada 5 minutos y al volver a primer plano.
 El parámetro `since` es **Unix timestamp en milisegundos**.
@@ -459,7 +538,7 @@ El doc está desactualizado en varios puntos. Backend debe actualizar antes del 
 | `GET /api/v1/free-play/games/` | ✅ | Funcionando |
 | `GET /api/v1/players/search/` con avatar_url | ✅ shipped 7.2.c | Funcionando |
 | `POST /api/v1/sync/` con idempotencia | ✅ | 🔴 Campo `reason` vs `error` — bug confirmado (I-1) |
-| `GET /api/v1/sync/pull/?since=` | ✅ shipped 7.2.b | Verificar `server_time_ms` |
+| `GET /api/v1/sync/pull/?since=` | ✅ shipped 7.2.b | ⬜ Ampliar con clubs/courses/user_profile (I-2) |
 | `POST /api/v1/sync/bootstrap/` | ✅ shipped | Verificar si response tiene datos |
 | `GET /api/v1/scoring/leaderboard/{group_code}/` | ✅ shipped `a89e62e8` | Funcionando |
 | WS canal por `ScoringSession.uuid` | ✅ | Verificar routing |

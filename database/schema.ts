@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export default appSchema({
-  version: 7,
+  version: 8,
   tables: [
     // ─── Rounds ───────────────────────────────────────────────────────────────
     tableSchema({
@@ -81,12 +81,44 @@ export default appSchema({
         { name: 'last_error', type: 'string', isOptional: true },
       ],
     }),
+    // ─── Clubs cache ──────────────────────────────────────────────────────────
+    tableSchema({
+      name: 'clubs_cache',
+      columns: [
+        { name: 'external_id', type: 'string', isIndexed: true },
+        { name: 'name', type: 'string' },
+        { name: 'city', type: 'string', isOptional: true },
+        { name: 'country', type: 'string', isOptional: true },
+        { name: 'address', type: 'string', isOptional: true },
+        { name: 'phone', type: 'string', isOptional: true },
+        { name: 'website', type: 'string', isOptional: true },
+        { name: 'logo_url', type: 'string', isOptional: true },
+        { name: 'synced_at', type: 'number' },
+      ],
+    }),
+    // ─── User profile cache ───────────────────────────────────────────────────
+    tableSchema({
+      name: 'user_profile',
+      columns: [
+        { name: 'external_id', type: 'string', isIndexed: true },
+        { name: 'first_name', type: 'string' },
+        { name: 'last_name', type: 'string' },
+        { name: 'email', type: 'string' },
+        { name: 'phone', type: 'string', isOptional: true },
+        { name: 'handicap_index', type: 'number', isOptional: true },
+        { name: 'avatar_url', type: 'string', isOptional: true },
+        { name: 'home_club_id', type: 'string', isOptional: true },   // FK -> clubs_cache.external_id
+        { name: 'license_number', type: 'string', isOptional: true },
+        { name: 'synced_at', type: 'number' },
+      ],
+    }),
     // ─── Courses & routes ─────────────────────────────────────────────────────
     tableSchema({
       name: 'courses',
       columns: [
         { name: 'external_id', type: 'string', isIndexed: true },
         { name: 'name', type: 'string' },
+        { name: 'club_id', type: 'string', isOptional: true, isIndexed: true }, // FK -> clubs_cache.external_id
         { name: 'city', type: 'string', isOptional: true },
         { name: 'country', type: 'string', isOptional: true },
         { name: 'synced_at', type: 'number' },
@@ -95,6 +127,7 @@ export default appSchema({
     tableSchema({
       name: 'routes',
       columns: [
+        { name: 'external_id', type: 'string', isOptional: true, isIndexed: true }, // UUID del backend
         { name: 'course_id', type: 'string', isIndexed: true },
         { name: 'course_external_id', type: 'string', isIndexed: true },
         { name: 'name', type: 'string' },

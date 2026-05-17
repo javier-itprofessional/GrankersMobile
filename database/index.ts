@@ -15,6 +15,8 @@ import PlayerCache from './models/PlayerCache';
 import LeaderboardCache from './models/LeaderboardCache';
 import MediaAttachment from './models/MediaAttachment';
 import RankingsCache from './models/RankingsCache';
+import ClubCache from './models/ClubCache';
+import UserProfile from './models/UserProfile';
 
 const adapter = new SQLiteAdapter({
   schema,
@@ -25,7 +27,7 @@ const adapter = new SQLiteAdapter({
 
 export const database = new Database({
   adapter,
-  modelClasses: [Round, RoundPlayer, HoleScore, AppConfig, Course, Route, Hole, ActionLog, TourEvent, PlayerCache, LeaderboardCache, MediaAttachment, RankingsCache],
+  modelClasses: [Round, RoundPlayer, HoleScore, AppConfig, Course, Route, Hole, ActionLog, TourEvent, PlayerCache, LeaderboardCache, MediaAttachment, RankingsCache, ClubCache, UserProfile],
 });
 
 export { default as Round } from './models/Round';
@@ -41,3 +43,5 @@ export { default as PlayerCache } from './models/PlayerCache';
 export { default as LeaderboardCache } from './models/LeaderboardCache';
 export { default as MediaAttachment } from './models/MediaAttachment';
 export { default as RankingsCache } from './models/RankingsCache';
+export { default as ClubCache } from './models/ClubCache';
+export { default as UserProfile } from './models/UserProfile';

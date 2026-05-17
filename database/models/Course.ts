@@ -10,6 +10,7 @@ export default class Course extends Model {
 
   @text('external_id') externalId!: string;
   @text('name') name!: string;
+  @text('club_id') clubId!: string | null;
   @text('city') city!: string | null;
   @text('country') country!: string | null;
   @field('synced_at') syncedAt!: number;

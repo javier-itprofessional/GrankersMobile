@@ -10,6 +10,7 @@ export default class Route extends Model {
     holes: { type: 'has_many' as const, foreignKey: 'route_id' },
   };
 
+  @text('external_id') externalId!: string | null;
   @text('course_id') courseId!: string;
   @text('course_external_id') courseExternalId!: string;
   @text('name') name!: string;

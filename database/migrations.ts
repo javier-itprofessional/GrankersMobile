@@ -4,6 +4,53 @@ import { schemaMigrations, addColumns, createTable, unsafeExecuteSql } from '@no
 
 export default schemaMigrations({
   migrations: [
+    // ─── v8: clubs_cache, user_profile; club_id en courses; external_id en routes
+    {
+      toVersion: 8,
+      steps: [
+        createTable({
+          name: 'clubs_cache',
+          columns: [
+            { name: 'external_id', type: 'string', isIndexed: true },
+            { name: 'name', type: 'string' },
+            { name: 'city', type: 'string', isOptional: true },
+            { name: 'country', type: 'string', isOptional: true },
+            { name: 'address', type: 'string', isOptional: true },
+            { name: 'phone', type: 'string', isOptional: true },
+            { name: 'website', type: 'string', isOptional: true },
+            { name: 'logo_url', type: 'string', isOptional: true },
+            { name: 'synced_at', type: 'number' },
+          ],
+        }),
+        createTable({
+          name: 'user_profile',
+          columns: [
+            { name: 'external_id', type: 'string', isIndexed: true },
+            { name: 'first_name', type: 'string' },
+            { name: 'last_name', type: 'string' },
+            { name: 'email', type: 'string' },
+            { name: 'phone', type: 'string', isOptional: true },
+            { name: 'handicap_index', type: 'number', isOptional: true },
+            { name: 'avatar_url', type: 'string', isOptional: true },
+            { name: 'home_club_id', type: 'string', isOptional: true },
+            { name: 'license_number', type: 'string', isOptional: true },
+            { name: 'synced_at', type: 'number' },
+          ],
+        }),
+        addColumns({
+          table: 'courses',
+          columns: [
+            { name: 'club_id', type: 'string', isOptional: true, isIndexed: true },
+          ],
+        }),
+        addColumns({
+          table: 'routes',
+          columns: [
+            { name: 'external_id', type: 'string', isOptional: true, isIndexed: true },
+          ],
+        }),
+      ],
+    },
     // ─── v7: drop legacy pending_syncs table ──────────────────────────────────
     {
       toVersion: 7,
