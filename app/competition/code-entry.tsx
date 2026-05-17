@@ -3,6 +3,7 @@ import { useState, useRef } from 'react';
 import { useRouter, Stack } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import Colors from '../../constants/colors';
+import { FontFamily } from '../../constants/Typography';
 import { fetchCompetitionData } from '@/services/game-service';
 import { CheckCircle } from 'lucide-react-native';
 
@@ -182,16 +183,19 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   iconText: {
+    fontFamily: FontFamily.headingBold,
     fontSize: 28,
     fontWeight: '800' as const,
     color: Colors.golf.primary,
   },
   title: {
+    fontFamily: FontFamily.heading,
     fontSize: 26,
     fontWeight: '700' as const,
     color: Colors.golf.text,
   },
   subtitle: {
+    fontFamily: FontFamily.body,
     fontSize: 15,
     color: Colors.golf.textLight,
     lineHeight: 22,
@@ -208,6 +212,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   codeInput: {
+    fontFamily: FontFamily.headingSemi,
     width: 48,
     height: 60,
     borderWidth: 1.5,
@@ -229,6 +234,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   loadingText: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 15,
     color: Colors.golf.textLight,
     fontWeight: '500' as const,
@@ -244,6 +250,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   errorText: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 15,
     color: Colors.golf.error,
     textAlign: 'center',
@@ -256,6 +263,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   retryButtonText: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 15,
     color: '#FFFFFF',
     fontWeight: '600' as const,
@@ -282,6 +290,7 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   loadButtonText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 17,
     fontWeight: '700' as const,
     color: '#FFFFFF',

@@ -4,6 +4,7 @@ import type { HoleScore } from '../../types/game';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Minus, Plus, ArrowLeft, LogOut, ChevronRight, Trophy, CreditCard } from 'lucide-react-native';
 import Colors from '../../constants/colors';
+import { FontFamily } from '../../constants/Typography';
 import { useCompetition } from '../../providers/CompetitionProvider';
 import { useFreePlay } from '../../providers/FreePlayProvider';
 import ConnectionStatus from '../../components/ConnectionStatus';
@@ -527,11 +528,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   competitionName: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 18,
     fontWeight: '700' as const,
     color: '#FFFFFF',
   },
   pruebaText: {
+    fontFamily: FontFamily.body,
     fontSize: 14,
     fontWeight: '500' as const,
     color: 'rgba(255,255,255,0.7)',
@@ -549,12 +552,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   holeLabel: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 9,
     fontWeight: '700' as const,
     color: 'rgba(255,255,255,0.6)',
     letterSpacing: 1,
   },
   holeValue: {
+    fontFamily: FontFamily.headingBold,
     fontSize: 30,
     fontWeight: '800' as const,
     color: '#FFFFFF',
@@ -567,12 +572,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   parLabel: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 9,
     fontWeight: '700' as const,
     color: 'rgba(255,255,255,0.6)',
     letterSpacing: 1,
   },
   parValue: {
+    fontFamily: FontFamily.headingBold,
     fontSize: 30,
     fontWeight: '800' as const,
     color: '#FFFFFF',
@@ -585,12 +592,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   hcpLabel: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 9,
     fontWeight: '700' as const,
     color: 'rgba(255,255,255,0.6)',
     letterSpacing: 1,
   },
   hcpValue: {
+    fontFamily: FontFamily.headingBold,
     fontSize: 30,
     fontWeight: '800' as const,
     color: '#FFFFFF',
@@ -610,6 +619,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   actionBtnText: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 14,
     fontWeight: '600' as const,
     color: '#FFFFFF',
@@ -627,6 +637,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   saveBtnText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 14,
     fontWeight: '700' as const,
     color: '#FFFFFF',
@@ -686,6 +697,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.golf.accent,
   },
   playerName: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 16,
     fontWeight: '600' as const,
     color: Colors.golf.text,
@@ -700,6 +712,7 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
   },
   tagMe: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 11,
     fontWeight: '700' as const,
     color: Colors.golf.primary,
@@ -710,6 +723,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   tagMarcando: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 11,
     fontWeight: '700' as const,
     color: Colors.golf.accent,
@@ -724,6 +738,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   playerScore: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 15,
     fontWeight: '700' as const,
     color: Colors.golf.text,
@@ -763,6 +778,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.golf.primary,
   },
   scoreValue: {
+    fontFamily: FontFamily.headingBold,
     fontSize: 32,
     fontWeight: '800' as const,
     color: Colors.golf.text,
@@ -789,6 +805,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   footerBtnText: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 12,
     fontWeight: '600' as const,
     color: '#FFFFFF',
@@ -802,6 +819,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   footerBtnDangerText: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 12,
     fontWeight: '600' as const,
     color: '#FF6B6B',

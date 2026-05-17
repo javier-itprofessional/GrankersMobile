@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-nati
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { Users, Calendar, Trophy } from 'lucide-react-native';
 import Colors from '../../constants/colors';
+import { FontFamily } from '../../constants/Typography';
 import { useCompetition } from '../../providers/CompetitionProvider';
 import type { FirebaseCompetitionData, Competition } from '../../types/game';
 
@@ -139,6 +140,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
+    fontFamily: FontFamily.heading,
     fontSize: 24,
     fontWeight: '700' as const,
     color: Colors.golf.text,
@@ -165,12 +167,14 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.golf.border,
   },
   cardHeaderText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 12,
     fontWeight: '700' as const,
     color: Colors.golf.textLight,
     letterSpacing: 0.8,
   },
   infoValue: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 18,
     fontWeight: '600' as const,
     color: Colors.golf.text,
@@ -198,11 +202,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   playerNumberText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 14,
     fontWeight: '700' as const,
     color: '#FFFFFF',
   },
   playerName: {
+    fontFamily: FontFamily.bodySemi,
     flex: 1,
     fontSize: 16,
     fontWeight: '600' as const,
@@ -215,6 +221,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   handicapText: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 13,
     fontWeight: '600' as const,
     color: Colors.golf.textLight,
@@ -235,6 +242,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   acceptButtonText: {
+    fontFamily: FontFamily.bodyBold,
     fontSize: 17,
     fontWeight: '700' as const,
     color: '#FFFFFF',
@@ -248,6 +256,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.golf.border,
   },
   errorButtonText: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 16,
     fontWeight: '600' as const,
     color: Colors.golf.textLight,

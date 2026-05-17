@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import Colors from '../../constants/colors';
+import { FontFamily } from '../../constants/Typography';
 import { useCompetition } from '../../providers/CompetitionProvider';
 import { useFreePlay } from '../../providers/FreePlayProvider';
 
@@ -66,11 +67,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: {
+    fontFamily: FontFamily.heading,
     fontSize: 24,
     fontWeight: '700' as const,
     color: Colors.golf.text,
   },
   subtitle: {
+    fontFamily: FontFamily.body,
     fontSize: 16,
     color: Colors.golf.textLight,
     lineHeight: 22,
@@ -96,6 +99,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   holeNumber: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 28,
     fontWeight: '700' as const,
     color: Colors.golf.primary,

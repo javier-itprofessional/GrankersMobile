@@ -4,6 +4,7 @@ import { UserCheck } from 'lucide-react-native';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import * as Application from 'expo-application';
 import Colors from '../../constants/colors';
+import { FontFamily } from '../../constants/Typography';
 import { useCompetition } from '../../providers/CompetitionProvider';
 import { linkDeviceToCompetitionPlayer, subscribeToCompetitionPlayers } from '@/services/game-service';
 
@@ -270,11 +271,13 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   title: {
+    fontFamily: FontFamily.heading,
     fontSize: 28,
     fontWeight: '700' as const,
     color: Colors.golf.text,
   },
   subtitle: {
+    fontFamily: FontFamily.body,
     fontSize: 16,
     color: Colors.golf.textLight,
     textAlign: 'center',
@@ -301,11 +304,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   playerName: {
+    fontFamily: FontFamily.headingSemi,
     fontSize: 20,
     fontWeight: '700' as const,
     color: Colors.golf.text,
   },
   playerHandicap: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 15,
     fontWeight: '600' as const,
     color: Colors.golf.textLight,
@@ -321,11 +326,13 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   loadingText: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 18,
     fontWeight: '600' as const,
     color: Colors.golf.textLight,
   },
   infoText: {
+    fontFamily: FontFamily.bodySemi,
     fontSize: 14,
     color: Colors.golf.primary,
     textAlign: 'center',
@@ -340,6 +347,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   linkingText: {
+    fontFamily: FontFamily.bodyMedium,
     fontSize: 16,
     fontWeight: '500' as const,
     color: Colors.golf.textLight,
