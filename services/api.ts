@@ -17,7 +17,7 @@ async function refreshTokens(): Promise<boolean> {
   const deviceId = await getDeviceId();
   if (!refreshToken) return false;
 
-  const response = await fetch(`${API_URL}/auth/mobile/refresh/`, {
+  const response = await fetch(`${API_URL}/api/v1/auth/mobile/refresh/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Device-ID': deviceId },
     body: JSON.stringify({ refresh: refreshToken }),

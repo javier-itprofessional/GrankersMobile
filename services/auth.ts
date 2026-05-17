@@ -29,7 +29,7 @@ export async function loginWithGoogle(): Promise<{ uuid: string }> {
   if (!idToken) throw new Error('No se pudo obtener el token de Google');
 
   const deviceId = await getDeviceId();
-  const response = await fetch(`${API_URL}/auth/mobile/google/`, {
+  const response = await fetch(`${API_URL}/api/v1/auth/mobile/google/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Device-ID': deviceId },
     body: JSON.stringify({ id_token: idToken }),
@@ -47,7 +47,7 @@ export async function loginWithGoogle(): Promise<{ uuid: string }> {
 
 export async function requestMagicLink(email: string): Promise<void> {
   const deviceId = await getDeviceId();
-  const response = await fetch(`${API_URL}/auth/mobile/magic-link/`, {
+  const response = await fetch(`${API_URL}/api/v1/auth/mobile/magic-link/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Device-ID': deviceId },
     body: JSON.stringify({ email }),
@@ -61,7 +61,7 @@ export async function requestMagicLink(email: string): Promise<void> {
 
 export async function verifyMagicLink(token: string): Promise<{ uuid: string }> {
   const deviceId = await getDeviceId();
-  const response = await fetch(`${API_URL}/auth/mobile/magic-link/verify/`, {
+  const response = await fetch(`${API_URL}/api/v1/auth/mobile/magic-link/verify/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Device-ID': deviceId },
     body: JSON.stringify({ token }),
@@ -81,7 +81,7 @@ export async function register(params: {
   country: string;
 }): Promise<void> {
   const deviceId = await getDeviceId();
-  const response = await fetch(`${API_URL}/auth/mobile/register/`, {
+  const response = await fetch(`${API_URL}/api/v1/auth/mobile/register/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Device-ID': deviceId },
     body: JSON.stringify(params),
@@ -97,7 +97,7 @@ export async function logout(): Promise<void> {
   try {
     const refreshToken = await AuthStorage.getRefreshToken();
     if (refreshToken) {
-      await apiRequest('/auth/mobile/logout/', {
+      await apiRequest('/api/v1/auth/mobile/logout/', {
         method: 'POST',
         body: JSON.stringify({ refresh: refreshToken }),
       });
