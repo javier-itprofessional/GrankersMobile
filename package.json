@@ -12,6 +12,8 @@
     "test": "jest"
   },
   "dependencies": {
+    "@expo-google-fonts/barlow": "^0.4.1",
+    "@expo-google-fonts/dm-sans": "^0.4.2",
     "@expo/vector-icons": "^15.0.3",
     "@nkzw/create-context-hook": "^1.1.0",
     "@nozbe/watermelondb": "0.27.0",
