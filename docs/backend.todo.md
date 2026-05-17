@@ -15,7 +15,7 @@
 | `c1e6c665` | Campos extra en `/competitions/active/`: `route_name`, `player_id`, `player_first_name`, `player_last_name` | Mobile puede prescindir de la segunda llamada a `/competitions/{group_code}/` para identidad del jugador |
 | `f3ab6c41` | `vs_par` numérico en `leaderboard_updated` WS + REST leaderboard | Líderes en rondas parciales se muestran correctamente |
 
-> **Pendiente confirmar:** I-1 — campo `reason` vs `error` en `/api/v1/sync/` (ver abajo).
+> **🔴 Bug confirmado:** I-1 — campo `reason` vs `error` en `/api/v1/sync/` (ver abajo). Verificado contra código mobile 2026-05-17.
 
 ---
 
@@ -132,7 +132,7 @@ Mobile usa este endpoint para obtener la sesión activa del dispositivo al arran
 
 ## 🟡 Importantes — Necesarios para QA end-to-end
 
-### I-1 — `POST /api/v1/sync/` — Campo `reason` en `failed[]`
+### I-1 — `POST /api/v1/sync/` — Campo `reason` en `failed[]` 🔴 BUG CONFIRMADO
 
 Mobile espera `reason`, no `error`:
 
@@ -145,10 +145,33 @@ Mobile espera `reason`, no `error`:
 }
 ```
 
-Mobile filtra estos prefijos como **no reintentables**: `invalid_payload`, `unauthorized`, `not_found`, `session_locked`.  
-Si el backend devuelve `"error"` en lugar de `"reason"`, los fallos transitorios nunca se reintentan.
+Mobile filtra estos prefijos como **no reintentables**: `invalid_payload`, `unauthorized`, `not_found`, `session_locked`.
 
-**Estado backend:** ⬜ Verificar nombre del campo
+**Bug verificado en código mobile (2026-05-17):**
+
+`services/sync-engine.ts` línea 165:
+```ts
+// SyncResponse interface — espera "reason" hardcodeado
+failed: { id: string; reason: string }[];  // "reason" per spec
+
+// Consumo en flush()
+const failedMap = new Map(response.failed.map((f) => [f.id, f.reason]));
+// ...
+const reason = failedMap.get(action.id) ?? 'unknown';
+const isTransient = ![...NON_RETRIABLE_PREFIXES].some((p) => reason.startsWith(p));
+```
+
+**Si backend devuelve `error` en lugar de `reason`:**
+1. `f.reason` → `undefined`
+2. Fallback → `'unknown'`
+3. `'unknown'.startsWith('invalid_payload')` → `false` → `isTransient = true`
+4. **Resultado:** acciones con `invalid_payload`, `session_locked`, etc. se reintentan indefinidamente → cola atascada permanentemente
+
+**Acción requerida:** backend debe confirmar si el campo se llama `reason` o `error`.
+- Si es `error` → backend cambia a `reason` (correcto según contrato)
+- Alternativa mobile: leer `f.reason ?? (f as any).error` como parche temporal
+
+**Estado backend:** 🔴 Pendiente confirmación urgente — bloquea QA end-to-end
 
 ---
 
@@ -435,7 +458,7 @@ El doc está desactualizado en varios puntos. Backend debe actualizar antes del 
 | `POST /api/v1/free-play/games/` | ✅ | QA con route_uuid pendiente |
 | `GET /api/v1/free-play/games/` | ✅ | Funcionando |
 | `GET /api/v1/players/search/` con avatar_url | ✅ shipped 7.2.c | Funcionando |
-| `POST /api/v1/sync/` con idempotencia | ✅ | Verificar campo `reason` |
+| `POST /api/v1/sync/` con idempotencia | ✅ | 🔴 Campo `reason` vs `error` — bug confirmado (I-1) |
 | `GET /api/v1/sync/pull/?since=` | ✅ shipped 7.2.b | Verificar `server_time_ms` |
 | `POST /api/v1/sync/bootstrap/` | ✅ shipped | Verificar si response tiene datos |
 | `GET /api/v1/scoring/leaderboard/{group_code}/` | ✅ shipped `a89e62e8` | Funcionando |
