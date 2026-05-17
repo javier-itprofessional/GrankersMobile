@@ -1,8 +1,19 @@
 # Backend TODO — Integración Mobile
 
-> Generado 2026-04-24. Última actualización 2026-05-17.  
+> Generado 2026-04-24. Última actualización 2026-05-17 (2).  
 > Referencia: `docs/todo.md` (lado mobile), `docs/technical-architecture.md`.  
-> Estado mobile: `main` — refactor estructural + tipografía Barlow/DM Sans completado. Build preview Android funcionando.
+> Estado mobile: `main` — sección de perfil de jugador completa (caché local AsyncStorage + CRUD backend).
+
+---
+
+## Ships de backend incorporados desde última sync (2026-05-17 #2)
+
+| Cambio mobile | Endpoints consumidos | Estado |
+|---------------|----------------------|--------|
+| Sección perfil jugador — caché local | `GET /api/v1/user/me/` · `/me/dashboard-stats/` · `/me/upcoming-events/` · `/me/licenses/` | Nuevo — ver N-5 |
+| Edición de perfil personal | `PATCH /api/v1/user/{uuid}/` | Nuevo — ver N-5 |
+| CRUD licencias federativas | `POST/PATCH/DELETE /api/v1/user/me/licenses/` | Nuevo — ver N-5 |
+| Selector de federación | `GET /api/v1/golf-federation/` | Nuevo — ver N-5 |
 
 ---
 
@@ -509,6 +520,105 @@ Y espera que el response incluya `route_uuid` para confirmarlo:
 
 ---
 
+### N-5 — Sección perfil de jugador — endpoints consumidos (NUEVO 2026-05-17)
+
+Mobile implementó la sección completa de perfil de jugador. Los datos se cargan **una sola vez en el login**, se guardan en AsyncStorage y se recargan en background cada 5 minutos. Cualquier mutación (editar perfil, CRUD licencias) llama al backend primero y usa la respuesta para actualizar la caché local — nunca al revés.
+
+#### Endpoints read (cargados en paralelo al hacer login)
+
+| Endpoint | Descripción | Shape devuelto |
+|----------|-------------|----------------|
+| `GET /api/v1/user/me/` | Perfil completo del usuario autenticado | Ver abajo |
+| `GET /api/v1/user/me/dashboard-stats/` | Contadores para el dashboard | `{ events_count, tours_count, clubs_count }` |
+| `GET /api/v1/user/me/upcoming-events/` | Inscripciones del jugador (hasta 200, orden `−start_date`) | Ver abajo |
+| `GET /api/v1/user/me/licenses/` | Licencias federativas del jugador | Ver abajo |
+| `GET /api/v1/golf-federation/` | Listado de federaciones (para el selector de licencias) | `[{ uuid, name, code }]` |
+
+**Shape esperado de `GET /api/v1/user/me/`:**
+```json
+{
+  "uuid": "<uuid>",
+  "email": "alice@grankers.com",
+  "first_name": "Alice",
+  "last_name": "Doe",
+  "phone_number": "+34600000000",
+  "dob": "1990-05-15",
+  "gender": "female",
+  "language": "es",
+  "profile_picture": "<url-firmada-o-null>",
+  "role": "user",
+  "status": "active",
+  "home_club": "<uuid-o-null>",
+  "date_joined": "2024-01-15T10:00:00Z",
+  "managed_club": null
+}
+```
+
+> **⚠️ Verificar:** mobile espera `profile_picture` como URL firmada (string o null), no como UUID del File.  
+> El frontend usa `profile_picture_url` — si el campo del serializer no devuelve la URL directamente, el backend debe añadir `profile_picture_url` al serializer de `me/` o asegurarse de que `profile_picture` ya resuelva a URL.
+
+**Shape esperado de `GET /api/v1/user/me/upcoming-events/`:**
+```json
+[
+  {
+    "registration_uuid": "<uuid>",
+    "event_name": "Spring Open 2026",
+    "event_slug": "spring-open-2026",
+    "tour_name": "Liga Grankers 2026",
+    "tour_slug": "liga-grankers-2026",
+    "golf_club_name": "Club de Golf La Moraleja",
+    "start_date": "2026-06-10T09:00:00Z",
+    "status": "confirmed",
+    "payment_status": "paid",
+    "fee_tier_name": "Early bird",
+    "price_paid": "45.00",
+    "team_name": null,
+    "is_solo": true,
+    "team_size": "individual"
+  }
+]
+```
+
+**Shape esperado de `GET /api/v1/user/me/licenses/`:**
+```json
+[
+  {
+    "uuid": "<uuid>",
+    "license_number": "MAD-12345",
+    "golf_federation_uuid": "<uuid>",
+    "golf_federation_name": "Real Federación Española de Golf",
+    "golf_federation_code": "RFEG",
+    "handicap": 12.5,
+    "license_expiry_date": "2026-12-31",
+    "created_at": "2024-01-15T10:00:00Z",
+    "updated_at": "2026-01-10T08:00:00Z"
+  }
+]
+```
+
+#### Endpoints write (siempre llaman al backend antes de actualizar la caché local)
+
+| Endpoint | Acción | Request body | Response usada |
+|----------|--------|--------------|----------------|
+| `PATCH /api/v1/user/{uuid}/` | Editar perfil | `{ first_name, last_name, phone_number, dob, gender, language }` | Perfil completo (mismo shape que `me/`) — se usa directamente para actualizar caché |
+| `POST /api/v1/user/me/licenses/` | Crear licencia | `{ license_number, golf_federation_uuid, handicap? }` | Licencia creada (mismo shape que el GET) |
+| `PATCH /api/v1/user/me/licenses/{uuid}/` | Editar licencia | `{ license_number?, golf_federation_uuid?, handicap? }` | Licencia actualizada |
+| `DELETE /api/v1/user/me/licenses/{uuid}/` | Borrar licencia | — | 204 No Content |
+| `PATCH /api/v1/user/{uuid}/` (multipart) | Subir foto de perfil | `FormData` con `profile_picture` (imagen) | Perfil completo con `profile_picture` como URL firmada |
+
+> **Importante sobre el PATCH de perfil:** mobile usa la respuesta del `PATCH` directamente como fuente de verdad para actualizar la caché. Si la respuesta no incluye todos los campos del perfil (o si `profile_picture` devuelve un UUID en lugar de URL), la caché quedará desincronizada.
+
+> **Campos editables expuestos en mobile:** `first_name`, `last_name`, `phone_number`, `dob`, `gender`, `language`. El `email` es de solo lectura en mobile (no se envía en el PATCH).
+
+#### Comportamiento de caché (para entender el impacto de latencia/errores)
+
+- Los 4 endpoints read se llaman en paralelo (`Promise.all`) al hacer login
+- Si alguno falla, el login sigue funcionando con los datos que hayan llegado
+- El background refresh es cada 5 minutos; si falla, la UI no lo nota (datos locales siguen disponibles)
+- La caché se **limpia completamente** al hacer logout (AsyncStorage clear)
+
+---
+
 ### N-4 — Auth refresh: `X-Device-ID` obligatorio
 
 `POST /api/v1/auth/mobile/refresh/` siempre lleva `X-Device-ID` en headers. Backend debe aceptarlo (no rechazar si no lo esperaba).
@@ -555,3 +665,9 @@ El doc está desactualizado en varios puntos. Backend debe actualizar antes del 
 | WS `score_confirmed` | ✅ shipped 7.1.c | Funcionando |
 | WS `player_status_changed` (organizer) | ✅ backend emite | Funcionando |
 | WS `round_finished` | ✅ backend emite | Funcionando |
+| `GET /api/v1/user/me/` | ✅ existe | ⚠️ Verificar que `profile_picture` devuelve URL firmada (N-5) |
+| `GET /api/v1/user/me/dashboard-stats/` | ✅ existe | Funcionando |
+| `GET /api/v1/user/me/upcoming-events/` | ✅ existe | Funcionando |
+| `GET /api/v1/user/me/licenses/` + CRUD | ✅ existe | Funcionando |
+| `PATCH /api/v1/user/{uuid}/` (perfil) | ✅ existe | ⚠️ Verificar que response incluye perfil completo con URL de foto (N-5) |
+| `GET /api/v1/golf-federation/` | ✅ existe | Funcionando |
