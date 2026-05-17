@@ -71,6 +71,7 @@ export async function apiRequest<T = any>(
 export async function apiRequestFormData<T = any>(
   path: string,
   body: FormData,
+  method: 'POST' | 'PATCH' = 'POST',
 ): Promise<T> {
   const [deviceId, accessTokenRaw] = await Promise.all([getDeviceId(), AuthStorage.getAccessToken()]);
   let accessToken = accessTokenRaw;
@@ -85,14 +86,14 @@ export async function apiRequestFormData<T = any>(
   if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
   // Do not set Content-Type — fetch sets it automatically with the multipart boundary
-  let response = await fetch(`${API_URL}${path}`, { method: 'POST', headers, body });
+  let response = await fetch(`${API_URL}${path}`, { method, headers, body });
 
   if (response.status === 401) {
     const refreshed = await refreshTokens();
     if (!refreshed) throw new Error('SESSION_EXPIRED');
     accessToken = await AuthStorage.getAccessToken();
     headers['Authorization'] = `Bearer ${accessToken ?? ''}`;
-    response = await fetch(`${API_URL}${path}`, { method: 'POST', headers, body });
+    response = await fetch(`${API_URL}${path}`, { method, headers, body });
   }
 
   if (!response.ok) {
