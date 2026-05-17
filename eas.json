@@ -9,7 +9,12 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.grankers.dev",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "1018215047600-7iulb2heq42l7d6pi7ohi9o640e0ig6b.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "1018215047600-pdti2059584s4kluatnjj8vv9p6rjh3s.apps.googleusercontent.com"
+      }
     },
     "production": {
       "autoIncrement": true
