@@ -5,16 +5,17 @@ import { useRouter, Stack } from 'expo-router';
 import { MapPin, ChevronDown, ArrowRight, Search, Users, X } from 'lucide-react-native';
 import Colors from '../../constants/colors';
 import { FontFamily } from '../../constants/Typography';
-import { listCourses, type CourseData, type RouteData } from '@/services/course-service';
+import { listCourseNames, getCourseRoutes, type CourseListItem, type RouteListItem } from '@/services/course-service';
 import { listFreePlayGames, type ScoringSession } from '@/services/game-service';
 
 export default function SelectCourseScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const [courses, setCourses] = useState<CourseData[]>([]);
-  const [selectedCourse, setSelectedCourse] = useState<CourseData | null>(null);
-  const [selectedRoute, setSelectedRoute] = useState<RouteData | null>(null);
+  const [courses, setCourses] = useState<CourseListItem[]>([]);
+  const [selectedCourse, setSelectedCourse] = useState<CourseListItem | null>(null);
+  const [routeList, setRouteList] = useState<RouteListItem[]>([]);
+  const [selectedRoute, setSelectedRoute] = useState<RouteListItem | null>(null);
 
   const [showCourseDropdown, setShowCourseDropdown] = useState<boolean>(false);
   const [showRouteDropdown, setShowRouteDropdown] = useState<boolean>(false);
@@ -33,7 +34,7 @@ export default function SelectCourseScreen() {
   const loadCourses = async () => {
     try {
       setLoading(true);
-      setCourses(await listCourses());
+      setCourses(await listCourseNames());
     } catch (error) {
       console.error('Error loading courses:', error);
       Alert.alert('Error', 'No se pudieron cargar los campos de golf');
@@ -42,14 +43,20 @@ export default function SelectCourseScreen() {
     }
   };
 
-  const handleSelectCourse = (course: CourseData) => {
+  const handleSelectCourse = async (course: CourseListItem) => {
     setSelectedCourse(course);
     setSelectedRoute(null);
+    setRouteList([]);
     setShowCourseDropdown(false);
     setCourseSearchText('');
+    try {
+      setRouteList(await getCourseRoutes(course.internalId));
+    } catch {
+      // Routes will be empty — user can retry by reselecting the course
+    }
   };
 
-  const handleSelectRoute = (route: RouteData) => {
+  const handleSelectRoute = (route: RouteListItem) => {
     setSelectedRoute(route);
     setShowRouteDropdown(false);
   };
@@ -58,7 +65,7 @@ export default function SelectCourseScreen() {
     if (!selectedCourse) return;
     try {
       setCheckingGames(true);
-      const sessions = await listFreePlayGames(selectedCourse.id, selectedRoute?.id);
+      const sessions = await listFreePlayGames(selectedCourse.id, selectedRoute?.externalId);
       if (sessions.length > 0) {
         setActiveSessions(sessions);
         setShowActiveGamesModal(true);
@@ -78,7 +85,7 @@ export default function SelectCourseScreen() {
       pathname: '/free-play/create-game',
       params: {
         courseUuid: selectedCourse!.id,
-        routeUuid: selectedRoute?.id ?? '',
+        routeUuid: selectedRoute?.externalId ?? '',
         courseName: selectedCourse!.name,
         routeName: selectedRoute?.name ?? '',
       },
@@ -99,7 +106,7 @@ export default function SelectCourseScreen() {
           }))
         ),
         courseUuid: selectedCourse!.id,
-        routeUuid: selectedRoute?.id ?? '',
+        routeUuid: selectedRoute?.externalId ?? '',
         courseName: selectedCourse!.name,
         routeName: selectedRoute?.name ?? '',
         gameName: session.gameName ?? '',
@@ -223,11 +230,11 @@ export default function SelectCourseScreen() {
             {showRouteDropdown && selectedCourse && (
               <View style={styles.dropdownMenu}>
                 <ScrollView style={styles.dropdownScroll} nestedScrollEnabled>
-                  {selectedCourse.routes.length > 0 ? (
-                    selectedCourse.routes.map((route) => (
+                  {routeList.length > 0 ? (
+                    routeList.map((route) => (
                       <TouchableOpacity
-                        key={route.id}
-                        style={[styles.dropdownItem, selectedRoute?.id === route.id && styles.dropdownItemSelected]}
+                        key={route.externalId}
+                        style={[styles.dropdownItem, selectedRoute?.externalId === route.externalId && styles.dropdownItemSelected]}
                         onPress={() => handleSelectRoute(route)}
                         testID={`route-item-${route.name}`}
                       >

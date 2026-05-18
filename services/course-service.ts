@@ -79,6 +79,22 @@ export interface CourseData {
   routes: RouteData[];
 }
 
+// Lightweight types for search dropdowns — no routes or holes loaded.
+export interface CourseListItem {
+  id: string;          // external_id (backend UUID)
+  internalId: string;  // WatermelonDB row id — used to fetch routes
+  name: string;
+  city?: string;
+  country?: string;
+}
+
+export interface RouteListItem {
+  externalId: string;  // backend UUID
+  name: string;
+  numHoles: number;
+  parTotal: number;
+}
+
 // ─── Transforms ───────────────────────────────────────────────────────────────
 
 function transformCourse(wire: WireCourseData): CourseData {
@@ -116,6 +132,31 @@ function transformCourse(wire: WireCourseData): CourseData {
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
+
+// Returns course names only — 1 DB query, no routes or holes loaded.
+// Use this for search dropdowns; call getCourseRoutes() after selection.
+export async function listCourseNames(): Promise<CourseListItem[]> {
+  const rows = await database.get<Course>('courses').query().fetch();
+  return rows.map((c) => ({
+    id: c.externalId,
+    internalId: c.id,
+    name: c.name,
+    city: c.city ?? undefined,
+    country: c.country ?? undefined,
+  }));
+}
+
+// Returns routes for a specific course — 1 DB query, no holes loaded.
+export async function getCourseRoutes(courseInternalId: string): Promise<RouteListItem[]> {
+  const rows = await database.get<Route>('routes')
+    .query(Q.where('course_id', courseInternalId)).fetch();
+  return rows.map((r) => ({
+    externalId: r.externalId ?? r.id,
+    name: r.name,
+    numHoles: r.numHoles,
+    parTotal: r.parTotal,
+  }));
+}
 
 // Returns all courses from local DB (populated by sync). Falls back to network
 // only if local DB is empty — avoids a fetch on every app open.
