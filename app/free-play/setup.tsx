@@ -25,6 +25,8 @@ export default function FreePlaySetupScreen() {
     courseName?: string;
     routeName?: string;
     gameName?: string;
+    isPrivate?: string;
+    gamePassword?: string;
   }>();
   const { resetFreePlay, setCourseInfo } = useFreePlay();
   const [players, setPlayers] = useState<{ id: string; firstName: string; lastName: string; license?: string; handicap?: string }[]>([]);
@@ -157,6 +159,8 @@ export default function FreePlaySetupScreen() {
         courseName: params.courseName,
         routeName: params.routeName,
         gameName: params.gameName,
+        isPrivate: params.isPrivate,
+        gamePassword: params.gamePassword,
       },
     });
   };
@@ -222,7 +226,7 @@ export default function FreePlaySetupScreen() {
 
     proceedToNextScreen(playersData, sessionUuid);
   };
-  
+
   const proceedToNextScreen = (playersData: { id: string; firstName: string; lastName: string; handicap: string; license?: string }[], sessionUuid: string | undefined) => {
     router.push({
       pathname: '/free-play/select-device-player',
@@ -234,6 +238,8 @@ export default function FreePlaySetupScreen() {
         courseName: params.courseName,
         routeName: params.routeName,
         gameName: params.gameName,
+        isPrivate: params.isPrivate,
+        gamePassword: params.gamePassword,
       },
     });
   };

@@ -34,6 +34,8 @@ export default class Round extends Model {
   @text('game_name') gameName!: string | null;
   @text('group_name') groupName!: string | null;
   @text('password') password!: string | null;
+  @field('is_private') isPrivate!: boolean | null;
+  @field('max_players') maxPlayers!: number | null;
 
   // Backend session UUID — used as WS channel key
   @text('session_uuid') sessionUuid!: string | null;

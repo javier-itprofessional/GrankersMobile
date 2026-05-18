@@ -4,6 +4,19 @@ import { schemaMigrations, addColumns, createTable, unsafeExecuteSql } from '@no
 
 export default schemaMigrations({
   migrations: [
+    // ─── v10: is_private + max_players en rounds ──────────────────────────────
+    {
+      toVersion: 10,
+      steps: [
+        addColumns({
+          table: 'rounds',
+          columns: [
+            { name: 'is_private', type: 'boolean', isOptional: true },
+            { name: 'max_players', type: 'number', isOptional: true },
+          ],
+        }),
+      ],
+    },
     // ─── v9: campos extra de hoyo (elevation, fairway_*)
     {
       toVersion: 9,

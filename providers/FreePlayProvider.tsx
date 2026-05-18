@@ -209,7 +209,11 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
     setDevicePlayerId(playerId);
   }, []);
 
-  const startFreePlay = useCallback(async (playersList: Player[], sessionUuid?: string) => {
+  const startFreePlay = useCallback(async (
+    playersList: Player[],
+    sessionUuid?: string,
+    options?: { isPrivate?: boolean; password?: string },
+  ) => {
     // Fetch real pars and handicaps from the course; fall back to random if unavailable
     let pars = generateHolePars();
     let hcps = holeHandicaps;
@@ -249,6 +253,9 @@ export const [FreePlayProvider, useFreePlay] = createContextHook(() => {
         r.holeHandicaps = JSON.stringify(hcps);
         r.gameName = gameName;
         r.groupName = groupName;
+        r.isPrivate = options?.isPrivate ?? false;
+        r.password = options?.password ?? null;
+        r.maxPlayers = playersList.length;
         r.sessionUuid = sessionUuid ?? null;
         r.currentScreen = '/game/scoring';
         r.createdAt = Date.now();

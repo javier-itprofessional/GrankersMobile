@@ -12,6 +12,8 @@ export default function SelectDevicePlayerScreen() {
     courseName?: string;
     routeName?: string;
     gameName?: string;
+    isPrivate?: string;
+    gamePassword?: string;
   }>();
   const { startFreePlay, setDevicePlayer } = useFreePlay();
 
@@ -27,7 +29,10 @@ export default function SelectDevicePlayerScreen() {
       isDevice: p.id === playerId,
     }));
 
-    startFreePlay(playersWithIds, params.sessionUuid || undefined);
+    startFreePlay(playersWithIds, params.sessionUuid || undefined, {
+      isPrivate: params.isPrivate === '1',
+      password: params.gamePassword || undefined,
+    });
     setDevicePlayer(playerId);
 
     setTimeout(() => {

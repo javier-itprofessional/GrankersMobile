@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export default appSchema({
-  version: 9,
+  version: 10,
   tables: [
     // ─── Rounds ───────────────────────────────────────────────────────────────
     tableSchema({
@@ -28,6 +28,8 @@ export default appSchema({
         { name: 'game_name', type: 'string', isOptional: true },
         { name: 'group_name', type: 'string', isOptional: true },
         { name: 'password', type: 'string', isOptional: true },
+        { name: 'is_private', type: 'boolean', isOptional: true },
+        { name: 'max_players', type: 'number', isOptional: true },
         { name: 'session_uuid', type: 'string', isOptional: true },
       ],
     }),
