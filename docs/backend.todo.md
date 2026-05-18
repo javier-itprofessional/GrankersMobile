@@ -17,6 +17,19 @@
 
 ---
 
+## Ships de backend incorporados desde última sync (2026-05-18)
+
+| Commit | Qué shippeó | Impacto mobile |
+|--------|-------------|----------------|
+| `9bdb54a` | `/sync/pull/` v2.7.0 — añade `user_profile`, `clubs`, `courses` (routes+holes embebidos), `players_cache` al top level | Bloquea I-2 — ver cambio de flujo cold-start abajo |
+| `9bdb54a` | `GET /api/v1/courses/` añade campos de geometría de hoyo (`elevation`, `fairway_*`) en todos los hoyos | Campos ya persistidos en WatermelonDB (schema v9) ✅ |
+| `9bdb54a` | Campo `reason` en `failed[]` de `POST /api/v1/sync/` confirmado en código | I-1 CERRADO ✅ |
+| `5321b58` | `route_uuid` round-trip en free-play — test E2E añadido `test_route_uuid_round_trip_end_to_end` | N-3 CERRADO ✅ |
+
+> **Cambio crítico de flujo cold-start (2026-05-18):** `POST /sync/bootstrap/` pasa a ser **fire-and-forget**. El cuerpo de respuesta ya no es la fuente de datos del primer arranque — `GET /sync/pull/?since=0` es más rico en todas las dimensiones. Ver I-3 abajo.
+
+---
+
 ## Ships de backend incorporados desde última sync (2026-04-24)
 
 | Commit | Qué shippeó | Impacto mobile |
@@ -143,57 +156,29 @@ Mobile usa este endpoint para obtener la sesión activa del dispositivo al arran
 
 ## 🟡 Importantes — Necesarios para QA end-to-end
 
-### I-1 — `POST /api/v1/sync/` — Campo `reason` en `failed[]` 🔴 BUG CONFIRMADO
+### I-1 — `POST /api/v1/sync/` — Campo `reason` en `failed[]` ✅ CERRADO 2026-05-18
 
-Mobile espera `reason`, no `error`:
+Confirmado en código `sync.py` línea 114: `failed.append({'id': str(action_id), 'reason': e.reason})`.  
+El campo se llama `reason` — coincide exactamente con lo que mobile espera. No hay acción pendiente.
 
-```json
-{
-  "synced": ["uuid-1"],
-  "failed": [
-    { "id": "uuid-2", "reason": "invalid_payload: score out of range" }
-  ]
-}
-```
+Prefijos no reintentables confirmados en el mismo fichero: `invalid_payload`, `unauthorized`, `internal`.
 
-Mobile filtra estos prefijos como **no reintentables**: `invalid_payload`, `unauthorized`, `not_found`, `session_locked`.
-
-**Bug verificado en código mobile (2026-05-17):**
-
-`services/sync-engine.ts` línea 165:
-```ts
-// SyncResponse interface — espera "reason" hardcodeado
-failed: { id: string; reason: string }[];  // "reason" per spec
-
-// Consumo en flush()
-const failedMap = new Map(response.failed.map((f) => [f.id, f.reason]));
-// ...
-const reason = failedMap.get(action.id) ?? 'unknown';
-const isTransient = ![...NON_RETRIABLE_PREFIXES].some((p) => reason.startsWith(p));
-```
-
-**Si backend devuelve `error` en lugar de `reason`:**
-1. `f.reason` → `undefined`
-2. Fallback → `'unknown'`
-3. `'unknown'.startsWith('invalid_payload')` → `false` → `isTransient = true`
-4. **Resultado:** acciones con `invalid_payload`, `session_locked`, etc. se reintentan indefinidamente → cola atascada permanentemente
-
-**Acción requerida:** backend debe confirmar si el campo se llama `reason` o `error`.
-- Si es `error` → backend cambia a `reason` (correcto según contrato)
-- Alternativa mobile: leer `f.reason ?? (f as any).error` como parche temporal
-
-**Estado backend:** 🔴 Pendiente confirmación urgente — bloquea QA end-to-end
+**Estado:** ✅ Verificado en código — no requiere cambios en mobile
 
 ---
 
-### I-2 — `GET /api/v1/sync/pull/?since=<unix_ms>` — Shape de respuesta (AMPLIADO)
+### I-2 — `GET /api/v1/sync/pull/?since=<unix_ms>` — Shape de respuesta ✅ SHIPPEADO 2026-05-18
 
-> **Actualizado 2026-05-17** — Mobile implementó offline cache de clubs, courses, hoyos y perfil de usuario (schema v8/v9). El endpoint debe incluir los nuevos campos.
+> **Actualizado 2026-05-18** — Backend shippeó spec v2.7.0. El endpoint ya devuelve todos los campos que mobile necesita (schema v8/v9). **Estado: ✅ backend completo — mobile debe integrar el nuevo shape.**
 
-Mobile espera ahora el siguiente shape completo:
+**Shape real devuelto (verificado en `sync.py` v2.7.0):**
 
 ```json
 {
+  "server_time_ms": 1747526400000,
+  "since_ms": 0,
+  "next_since_ms": 1747526400000,
+  "has_more": false,
   "user_profile": {
     "id": "<uuid>",
     "first_name": "Alice",
@@ -201,46 +186,33 @@ Mobile espera ahora el siguiente shape completo:
     "email": "alice@grankers.com",
     "phone": "+34600000000",
     "handicap_index": 12.5,
-    "avatar_url": "https://cdn.grankers.com/avatars/alice.jpg",
-    "home_club_id": "<club-uuid>",
-    "license_number": "MAD-12345"
+    "avatar_url": "<signed-url-or-null>",
+    "home_club_id": "<uuid-or-null>",
+    "license_number": "MAD-12345",
+    "updated_at_ms": 1747526400000
   },
   "clubs": [
     {
-      "id": "<uuid>",
-      "name": "Club de Golf La Moraleja",
-      "city": "Madrid",
-      "country": "ESP",
-      "address": "Calle del Golf 1",
-      "phone": "+34911234567",
-      "website": "https://lamoraleja.com",
-      "logo_url": "https://cdn.grankers.com/clubs/logo.png"
+      "id": "<uuid>", "name": "Club de Golf La Moraleja",
+      "city": "Madrid", "country": "ES", "address": "Calle del Golf 1",
+      "phone": "+34911234567", "website": "https://lamoraleja.com",
+      "logo_url": "<signed-url-or-null>", "updated_at_ms": 1747526400000
     }
   ],
   "courses": [
     {
-      "id": "<uuid>",
-      "name": "Course A",
-      "club_id": "<club-uuid>",
-      "city": "Madrid",
-      "country": "ESP",
+      "id": "<uuid>", "name": "Valderrama Course",
+      "city": "Sotogrande", "country": "ES",
       "routes": [
         {
-          "id": "<route-uuid>",
-          "name": "Black (Male)",
-          "num_holes": 18,
-          "par_total": 72,
-          "slope": 133,
-          "course_rating": 73.4,
-          "tee_color": "black",
-          "gender": "male",
-          "total_distance": 6234,
+          "id": "<uuid>", "name": "Black (Male)",
+          "tee_color": "black", "gender": "male",
+          "num_holes": 18, "par_total": 72,
+          "slope": 133, "course_rating": 72.5, "total_distance": 6234,
           "holes": [
             {
-              "number": 1, "par": 4, "handicap": 7,
-              "distance": 378, "distance_yards": 413,
-              "elevation": 12.5,
-              "fairway_width": 28.0, "fairway_length": 340.0,
+              "number": 1, "par": 4, "handicap": 7, "distance": 378,
+              "elevation": 12.5, "fairway_width": 28.0, "fairway_length": 340.0,
               "fairway_slope": 2.1, "fairway_slope_percentage": 3.7
             }
           ]
@@ -248,27 +220,36 @@ Mobile espera ahora el siguiente shape completo:
       ]
     }
   ],
-  "tour_events": [...],
-  "players_cache": [...],
-  "server_time_ms": 1745234567890
+  "players_cache": [
+    {
+      "uuid": "<uuid>", "external_id": "<uuid>",
+      "first_name": "Alice", "last_name": "Doe",
+      "license": "MAD-12345", "handicap_index": 12.5,
+      "avatar_url": "<signed-url-or-null>", "updated_at_ms": 1747526400000
+    }
+  ],
+  "datasets": {
+    "tour_events": [...],
+    "players": [...],
+    "leaderboards": [...],
+    "rankings": []
+  }
 }
 ```
 
-**Reglas del endpoint:**
-- Solo devolver registros con `updated_at > since` (filtrado por watermark en backend)
-- Si no hay cambios en un array, devolver `[]` — **no omitir la clave**
-- `user_profile` es el perfil del usuario autenticado en la petición — devolver siempre si ha cambiado, `null` u omitir si no hay cambios
-- `courses` incluye los routes y holes embebidos para evitar roundtrips — solo mandar courses que hayan cambiado (o cuyos routes/holes hayan cambiado)
-- `server_time_ms` es **crítico** — mobile lo usa como watermark para la próxima llamada
+**Notas importantes para mobile:**
+- `user_profile` es `null` si el perfil no cambió desde `since` — mobile conserva su copia local
+- `courses` solo incluye courses con `updated_at > since` en course, route o hole — filtro incremental real
+- `has_more=true` → re-llamar con `since=next_since_ms` hasta `has_more=false`
+- `players_cache` == `datasets.players` — mismo dato, dos claves para compatibilidad
+- Los hoyos ya **no** incluyen `distance_yards` — solo `distance` (metros). Mobile debe leer `distance` → `distanceMeters`
+- **Cold-start:** llamar con `since=0` devuelve todo el catálogo del usuario
 
-**Comportamiento en mobile (implementado en schema v8/v9):**
-- Upsert por `external_id` (UUID del backend) en todas las entidades
-- Routes: upsert por `external_id` del route (v8)
-- Holes: upsert por `route_id + hole_number`; almacena campos de geometría del hoyo (v9: `elevation`, `fairway_width`, `fairway_length`, `fairway_slope`, `fairway_slope_percentage`)
-- Courses: `listCourses()` lee de BD local primero; solo hace fetch a red si local está vacío
-- Todos los campos de hoyo son opcionales — si backend no los incluye, se almacenan como `null`
+**⚠️ Pendiente en mobile (bloqueante para offline mode):**
+- Conectar `GET /sync/pull/?since=` en `sync-engine.ts` — ver I-3
+- `user_profile` de pull tiene shape **diferente** al de `GET /api/v1/user/me/` (campos distintos: `phone` vs `phone_number`, sin `gender`/`language`/`role`). Ambos endpoints coexisten — usar `me/` para el perfil editable, `sync/pull/` para la caché offline de handicap/avatar.
 
-**Estado backend:** ⬜ Pendiente implementación — bloqueante para offline mode
+**Estado:** ✅ Backend completo — mobile debe integrar (ver I-3)
 
 ---
 
@@ -315,15 +296,22 @@ El parámetro `since` es **Unix timestamp en milisegundos**.
 
 ---
 
-### I-3 — `POST /api/v1/sync/bootstrap/` — Comportamiento esperado
+### I-3 — `POST /api/v1/sync/bootstrap/` — Flujo cold-start CAMBIADO ⚠️ 2026-05-18
 
-Mobile llama a este endpoint al arrancar si han pasado más de 24h desde la última llamada.
+**Decisión del backend (tasks/mobile-team-todo.md I-3):** El cuerpo de la respuesta de bootstrap ya no es la fuente de datos del primer arranque. `GET /sync/pull/?since=0` es más rico en todos los campos.
 
-**Request:** `POST` sin body (o body vacío `{}`).
+**Nuevo flujo de cold-start que mobile debe implementar:**
+1. `POST /sync/bootstrap/` — **fire-and-forget** (no parsear el body). Sirve para calentar el estado server-side (leaderboard materialization). Si falla, ignorar.
+2. `GET /sync/pull/?since=0` — leer todos los datos (user_profile, clubs, courses, players_cache, tour_events). Esta es la única fuente de verdad para el primer arranque.
 
-**Response esperada:** Mobile ignora el cuerpo actualmente. Si el backend quiere que mobile consuma datos del bootstrap (tour_events, players, leaderboard), comunicarlo para añadir el parsing.
+**Por qué cambia:** el body de bootstrap devuelve `data.courses` con formato antiguo (sin routes embebidos, sin geometría de hoyo). `sync/pull/` devuelve el shape v8/v9 completo con routes+holes. Mantener dos parsers sería deuda técnica innecesaria.
 
-**Estado backend:** ✅ shipped — ⬜ confirmar si la respuesta incluye datos consumibles
+**Impacto en mobile:**
+- Si `sync-engine.ts` hoy parsea la respuesta de bootstrap (`data.user`, `data.courses`, etc.) → **eliminar ese parsing**
+- El watermark de `app_config.last_sync_ms = 0` desencadena `GET /sync/pull/?since=0` en el primer arranque
+- Lógica de "si han pasado más de 24h → re-bootstrap" se mantiene, pero solo como trigger de `POST`, no de lectura
+
+**Estado:** ✅ Backend completo — ⚠️ Mobile debe actualizar su parsing de cold-start
 
 ---
 
