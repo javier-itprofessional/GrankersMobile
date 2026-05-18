@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { Users } from 'lucide-react-native';
 import Colors from '../../constants/colors';
@@ -29,45 +29,20 @@ export default function FreePlaySetupScreen() {
     gamePassword?: string;
   }>();
   const { resetFreePlay, setCourseInfo } = useFreePlay();
-  const [players, setPlayers] = useState<{ id: string; firstName: string; lastName: string; license?: string; handicap?: string }[]>([]);
-  const [isSaving, setIsSaving] = useState<boolean>(false);
-  const initializedRef = useRef(false);
-
-  useEffect(() => {
-    if (params.numberOfPlayers && !initializedRef.current) {
-      let initialPlayers;
-      
-      if (params.existingPlayers) {
-        try {
-          initialPlayers = JSON.parse(params.existingPlayers);
-          console.log('[Setup] Restoring existing players:', initialPlayers);
-        } catch (e) {
-          console.error('[Setup] Error parsing existing players:', e);
-          const numberOfPlayers = parseInt(params.numberOfPlayers, 10);
-          initialPlayers = Array.from({ length: numberOfPlayers }, (_, i) => ({
-            id: `${i + 1}`,
-            firstName: '',
-            lastName: '',
-            license: undefined,
-            handicap: undefined,
-          }));
-        }
-      } else {
-        const numberOfPlayers = parseInt(params.numberOfPlayers, 10);
-        initialPlayers = Array.from({ length: numberOfPlayers }, (_, i) => ({
-          id: `${i + 1}`,
-          firstName: '',
-          lastName: '',
-          license: undefined,
-          handicap: undefined,
-        }));
-        console.log('[Setup] Initializing new players:', initialPlayers);
-      }
-      
-      setPlayers(initialPlayers);
-      initializedRef.current = true;
+  const [players, setPlayers] = useState<{ id: string; firstName: string; lastName: string; license?: string; handicap?: string }[]>(() => {
+    if (params.existingPlayers) {
+      try { return JSON.parse(params.existingPlayers); } catch {}
     }
-  }, []);
+    const n = Math.max(1, Math.min(4, parseInt(params.numberOfPlayers ?? '2', 10)));
+    return Array.from({ length: n }, (_, i) => ({
+      id: `${i + 1}`,
+      firstName: '',
+      lastName: '',
+      license: undefined,
+      handicap: undefined,
+    }));
+  });
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
   useEffect(() => {
     const selectedPlayerId = params.selectedPlayerId;
