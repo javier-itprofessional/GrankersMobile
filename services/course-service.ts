@@ -310,10 +310,14 @@ async function routeRecordToData(routeRecord: Route): Promise<RouteData> {
 }
 
 async function getFromCache(courseName: string, routeName: string): Promise<RouteData | null> {
-  const routes = await database.get<Route>('routes')
-    .query(Q.and(Q.where('course_external_id', courseName), Q.where('name', routeName)))
-    .fetch();
+  // course_external_id stores the backend UUID, not the name — resolve via Course.name first.
+  const courseRows = await database.get<Course>('courses')
+    .query(Q.where('name', courseName)).fetch();
+  if (courseRows.length === 0) return null;
 
+  const routes = await database.get<Route>('routes')
+    .query(Q.and(Q.where('course_id', courseRows[0].id), Q.where('name', routeName)))
+    .fetch();
   if (routes.length === 0) return null;
 
   const route = routes[0];
@@ -321,7 +325,6 @@ async function getFromCache(courseName: string, routeName: string): Promise<Rout
 
   const holes = await database.get<Hole>('holes')
     .query(Q.where('route_id', route.id)).fetch();
-
   if (holes.length === 0) return null;
 
   return routeRecordToData(route);
