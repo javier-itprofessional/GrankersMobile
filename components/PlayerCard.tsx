@@ -54,33 +54,45 @@ export default function PlayerCard({
         )}
       </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Nombre"
-        value={firstName}
-        onChangeText={onChangeFirstName}
-        testID={`firstName-${index + 1}`}
-        editable={!isCompetition}
-      />
-
-      <TextInput
-        style={styles.input}
-        placeholder="Apellido"
-        value={lastName}
-        onChangeText={onChangeLastName}
-        testID={`lastName-${index + 1}`}
-        editable={!isCompetition}
-      />
-
-      {!isCompetition && (
+      <View style={styles.fieldGroup}>
+        <Text style={styles.fieldLabel}>Nombre</Text>
         <TextInput
           style={styles.input}
-          placeholder="Handicap"
-          value={handicap}
-          onChangeText={onChangeHandicap}
-          testID={`handicap-${index + 1}`}
-          keyboardType="numeric"
+          placeholder="Introduce el nombre"
+          placeholderTextColor={Colors.golf.textLight}
+          value={firstName}
+          onChangeText={onChangeFirstName}
+          testID={`firstName-${index + 1}`}
+          editable={!isCompetition}
         />
+      </View>
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.fieldLabel}>Apellido</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Introduce el apellido"
+          placeholderTextColor={Colors.golf.textLight}
+          value={lastName}
+          onChangeText={onChangeLastName}
+          testID={`lastName-${index + 1}`}
+          editable={!isCompetition}
+        />
+      </View>
+
+      {!isCompetition && (
+        <View style={styles.fieldGroup}>
+          <Text style={styles.fieldLabel}>Handicap</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="0"
+            placeholderTextColor={Colors.golf.textLight}
+            value={handicap}
+            onChangeText={onChangeHandicap}
+            testID={`handicap-${index + 1}`}
+            keyboardType="numeric"
+          />
+        </View>
       )}
 
       {isCompetition && (
@@ -159,6 +171,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600' as const,
     color: Colors.golf.primary,
+  },
+  fieldGroup: {
+    gap: 4,
+  },
+  fieldLabel: {
+    fontFamily: FontFamily.bodySemi,
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: Colors.golf.textLight,
+    marginLeft: 4,
   },
   input: {
     fontFamily: FontFamily.body,
