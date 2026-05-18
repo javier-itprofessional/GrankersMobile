@@ -8,7 +8,6 @@ import { subscribeToConnectionChanges, getAppConfig, setAppConfig } from '@/lib/
 const MAX_RETRIES = 5;
 const BATCH_SIZE = 50;
 const FLUSH_INTERVAL_MS = 30_000;   // flush periódico cada 30s
-const BOOTSTRAP_MAX_AGE_MS = 24 * 60 * 60 * 1_000;  // 24h
 
 // ─── Tipos del protocolo ──────────────────────────────────────────────────────
 
@@ -43,6 +42,7 @@ interface WireClub {
   phone?: string;
   website?: string;
   logo_url?: string | null;
+  updated_at_ms?: number;
 }
 
 interface WireHole {
@@ -50,7 +50,6 @@ interface WireHole {
   par: number;
   handicap: number;
   distance?: number;
-  distance_yards?: number;
   elevation?: number;
   fairway_width?: number;
   fairway_length?: number;
@@ -78,6 +77,7 @@ interface WireCourse {
   city?: string;
   country?: string;
   routes: WireRoute[];
+  updated_at_ms?: number;
 }
 
 interface WireUserProfile {
@@ -90,33 +90,48 @@ interface WireUserProfile {
   avatar_url?: string | null;
   home_club_id?: string | null;
   license_number?: string;
+  updated_at_ms?: number;
+}
+
+interface WireTourEvent {
+  id: string;
+  competition_name: string;
+  event_name: string;
+  date: string;
+  tee_time?: string;
+  format?: string;
+  status: string;
+  group_code?: string;
+  course_name?: string;
+  route_name?: string;
+  updated_at_ms?: number;
+}
+
+interface WirePlayerCache {
+  external_id: string;
+  first_name: string;
+  last_name: string;
+  license?: string;
+  handicap_index?: number;
+  avatar_url?: string | null;
+  updated_at_ms?: number;
 }
 
 interface WirePullResponse {
-  user_profile?: WireUserProfile;
+  server_time_ms: number;
+  since_ms: number;
+  next_since_ms: number;
+  has_more: boolean;
+  user_profile?: WireUserProfile | null;
   clubs?: WireClub[];
   courses?: WireCourse[];
-  tour_events?: Array<{
-    id: string;
-    competition_name: string;
-    event_name: string;
-    date: string;
-    tee_time?: string;
-    format?: string;
-    status: string;
-    group_code?: string;
-    course_name?: string;
-    route_name?: string;
-  }>;
-  players_cache?: Array<{
-    external_id: string;
-    first_name: string;
-    last_name: string;
-    license?: string;
-    handicap_index?: number;
-    avatar_url?: string | null;
-  }>;
-  server_time_ms: number;
+  players_cache?: WirePlayerCache[];
+  datasets?: {
+    tour_events?: WireTourEvent[];
+    players?: WirePlayerCache[];
+    leaderboards?: unknown[];
+    rankings?: unknown[];
+  };
 }
 
 // Razones de error que el backend nunca resolverá — no reintentar
@@ -246,16 +261,13 @@ export class SyncEngine {
     });
   }
 
-  // ─── Bootstrap (cold start / ≥24h inactivity) ────────────────────────────
+  // ─── Bootstrap (cold start) — fire-and-forget server-side trigger ───────────
 
   async bootstrap(): Promise<void> {
     try {
-      const lastBootstrap = parseInt(await getAppConfig('last_bootstrap_ms') ?? '0', 10);
-      if (Date.now() - lastBootstrap < BOOTSTRAP_MAX_AGE_MS) return;
       await apiRequest('/api/v1/sync/bootstrap/', { method: 'POST' });
-      await setAppConfig('last_bootstrap_ms', String(Date.now()));
     } catch {
-      // silently fail — will retry next foreground
+      // Fire-and-forget — pull() is the authoritative data source
     }
   }
 
@@ -265,240 +277,242 @@ export class SyncEngine {
     if (this.isPulling) return;
     this.isPulling = true;
     try {
-      const since = parseInt(await getAppConfig('last_pull_ms') ?? '0', 10);
-      const url = since > 0
-        ? `/api/v1/sync/pull/?since=${since}`
-        : '/api/v1/sync/pull/';
-      const data = await apiRequest<WirePullResponse>(url);
+      let since = parseInt(await getAppConfig('last_pull_ms') ?? '0', 10);
+      let hasMore = true;
 
-      await database.write(async () => {
-        const now = Date.now();
-
-        // ── user_profile ─────────────────────────────────────────────────────
-        if (data.user_profile) {
-          const p = data.user_profile;
-          const existing = await database.get<UserProfile>('user_profile')
-            .query(Q.where('external_id', p.id)).fetch();
-          if (existing.length > 0) {
-            await existing[0].update((r) => {
-              r.firstName = p.first_name;
-              r.lastName = p.last_name;
-              r.email = p.email;
-              r.phone = p.phone ?? null;
-              r.handicapIndex = p.handicap_index ?? null;
-              r.avatarUrl = p.avatar_url ?? null;
-              r.homeClubId = p.home_club_id ?? null;
-              r.licenseNumber = p.license_number ?? null;
-              r.syncedAt = now;
-            });
-          } else {
-            await database.get<UserProfile>('user_profile').create((r) => {
-              r.externalId = p.id;
-              r.firstName = p.first_name;
-              r.lastName = p.last_name;
-              r.email = p.email;
-              r.phone = p.phone ?? null;
-              r.handicapIndex = p.handicap_index ?? null;
-              r.avatarUrl = p.avatar_url ?? null;
-              r.homeClubId = p.home_club_id ?? null;
-              r.licenseNumber = p.license_number ?? null;
-              r.syncedAt = now;
-            });
-          }
-        }
-
-        // ── clubs ─────────────────────────────────────────────────────────────
-        for (const c of data.clubs ?? []) {
-          const existing = await database.get<ClubCache>('clubs_cache')
-            .query(Q.where('external_id', c.id)).fetch();
-          if (existing.length > 0) {
-            await existing[0].update((r) => {
-              r.name = c.name;
-              r.city = c.city ?? null;
-              r.country = c.country ?? null;
-              r.address = c.address ?? null;
-              r.phone = c.phone ?? null;
-              r.website = c.website ?? null;
-              r.logoUrl = c.logo_url ?? null;
-              r.syncedAt = now;
-            });
-          } else {
-            await database.get<ClubCache>('clubs_cache').create((r) => {
-              r.externalId = c.id;
-              r.name = c.name;
-              r.city = c.city ?? null;
-              r.country = c.country ?? null;
-              r.address = c.address ?? null;
-              r.phone = c.phone ?? null;
-              r.website = c.website ?? null;
-              r.logoUrl = c.logo_url ?? null;
-              r.syncedAt = now;
-            });
-          }
-        }
-
-        // ── courses + routes + holes ──────────────────────────────────────────
-        for (const wc of data.courses ?? []) {
-          let courseRecord: Course;
-          const existingCourses = await database.get<Course>('courses')
-            .query(Q.where('external_id', wc.id)).fetch();
-          if (existingCourses.length > 0) {
-            courseRecord = existingCourses[0];
-            await courseRecord.update((r) => {
-              r.name = wc.name;
-              r.clubId = wc.club_id ?? null;
-              r.city = wc.city ?? null;
-              r.country = wc.country ?? null;
-              r.syncedAt = now;
-            });
-          } else {
-            courseRecord = await database.get<Course>('courses').create((r) => {
-              r.externalId = wc.id;
-              r.name = wc.name;
-              r.clubId = wc.club_id ?? null;
-              r.city = wc.city ?? null;
-              r.country = wc.country ?? null;
-              r.syncedAt = now;
-            });
-          }
-
-          for (const wr of wc.routes) {
-            let routeRecord: Route;
-            // Upsert por external_id del backend cuando está disponible
-            const existingRoutes = await database.get<Route>('routes')
-              .query(Q.and(Q.where('course_id', courseRecord.id), Q.where('external_id', wr.id))).fetch();
-            if (existingRoutes.length > 0) {
-              routeRecord = existingRoutes[0];
-              await routeRecord.update((r) => {
-                r.name = wr.name;
-                r.numHoles = wr.num_holes;
-                r.parTotal = wr.par_total;
-                r.slope = wr.slope ?? null;
-                r.courseRating = wr.course_rating ?? null;
-                r.teeColor = wr.tee_color ?? null;
-                r.gender = wr.gender ?? null;
-                r.totalDistance = wr.total_distance ?? null;
-                r.syncedAt = now;
-              });
-            } else {
-              routeRecord = await database.get<Route>('routes').create((r) => {
-                r.externalId = wr.id;
-                r.courseId = courseRecord.id;
-                r.courseExternalId = wc.id;
-                r.name = wr.name;
-                r.numHoles = wr.num_holes;
-                r.parTotal = wr.par_total;
-                r.slope = wr.slope ?? null;
-                r.courseRating = wr.course_rating ?? null;
-                r.teeColor = wr.tee_color ?? null;
-                r.gender = wr.gender ?? null;
-                r.totalDistance = wr.total_distance ?? null;
-                r.syncedAt = now;
-              });
-            }
-
-            // Upsert hoyos por route_id + hole_number
-            for (const wh of wr.holes) {
-              const existingHoles = await database.get<Hole>('holes')
-                .query(Q.and(Q.where('route_id', routeRecord.id), Q.where('hole_number', wh.number))).fetch();
-              if (existingHoles.length > 0) {
-                await existingHoles[0].update((r) => {
-                  r.par = wh.par;
-                  r.handicap = wh.handicap;
-                  r.distanceMeters = wh.distance ?? null;
-                  r.distanceYards = wh.distance_yards ?? null;
-                  r.elevation = wh.elevation ?? null;
-                  r.fairwayWidth = wh.fairway_width ?? null;
-                  r.fairwayLength = wh.fairway_length ?? null;
-                  r.fairwaySlope = wh.fairway_slope ?? null;
-                  r.fairwaySlopePercentage = wh.fairway_slope_percentage ?? null;
-                });
-              } else {
-                await database.get<Hole>('holes').create((r) => {
-                  r.routeId = routeRecord.id;
-                  r.holeNumber = wh.number;
-                  r.par = wh.par;
-                  r.handicap = wh.handicap;
-                  r.distanceMeters = wh.distance ?? null;
-                  r.distanceYards = wh.distance_yards ?? null;
-                  r.elevation = wh.elevation ?? null;
-                  r.fairwayWidth = wh.fairway_width ?? null;
-                  r.fairwayLength = wh.fairway_length ?? null;
-                  r.fairwaySlope = wh.fairway_slope ?? null;
-                  r.fairwaySlopePercentage = wh.fairway_slope_percentage ?? null;
-                });
-              }
-            }
-          }
-        }
-
-        // ── players_cache ─────────────────────────────────────────────────────
-        for (const p of data.players_cache ?? []) {
-          const existing = await database.get<PlayerCache>('players_cache')
-            .query(Q.where('external_id', p.external_id)).fetch();
-          if (existing.length > 0) {
-            await existing[0].update((r) => {
-              r.firstName = p.first_name;
-              r.lastName = p.last_name;
-              r.license = p.license ?? null;
-              r.handicapIndex = p.handicap_index ?? null;
-              r.avatarUrl = p.avatar_url ?? null;
-              r.syncedAt = now;
-            });
-          } else {
-            await database.get<PlayerCache>('players_cache').create((r) => {
-              r.externalId = p.external_id;
-              r.firstName = p.first_name;
-              r.lastName = p.last_name;
-              r.license = p.license ?? null;
-              r.handicapIndex = p.handicap_index ?? null;
-              r.avatarUrl = p.avatar_url ?? null;
-              r.syncedAt = now;
-            });
-          }
-        }
-
-        // ── tour_events ───────────────────────────────────────────────────────
-        for (const e of data.tour_events ?? []) {
-          const existing = await database.get<TourEvent>('tour_events')
-            .query(Q.where('external_id', e.id)).fetch();
-          if (existing.length > 0) {
-            await existing[0].update((r) => {
-              r.competitionName = e.competition_name;
-              r.eventName = e.event_name;
-              r.date = e.date;
-              r.teeTime = e.tee_time ?? null;
-              r.format = (e.format as TourEvent['format']) ?? null;
-              r.status = e.status as TourEvent['status'];
-              r.groupCode = e.group_code ?? null;
-              r.courseName = e.course_name ?? null;
-              r.routeName = e.route_name ?? null;
-              r.syncedAt = now;
-            });
-          } else {
-            await database.get<TourEvent>('tour_events').create((r) => {
-              r.externalId = e.id;
-              r.competitionName = e.competition_name;
-              r.eventName = e.event_name;
-              r.date = e.date;
-              r.teeTime = e.tee_time ?? null;
-              r.format = (e.format as TourEvent['format']) ?? null;
-              r.status = e.status as TourEvent['status'];
-              r.groupCode = e.group_code ?? null;
-              r.courseName = e.course_name ?? null;
-              r.routeName = e.route_name ?? null;
-              r.syncedAt = now;
-            });
-          }
-        }
-      });
-
-      await setAppConfig('last_pull_ms', String(data.server_time_ms));
+      while (hasMore) {
+        const data = await apiRequest<WirePullResponse>(`/api/v1/sync/pull/?since=${since}`);
+        await this._ingestPullData(data);
+        const watermark = data.next_since_ms ?? data.server_time_ms;
+        await setAppConfig('last_pull_ms', String(watermark));
+        since = watermark;
+        hasMore = data.has_more ?? false;
+      }
     } catch {
       // Network error — will retry on next interval
     } finally {
       this.isPulling = false;
     }
+  }
+
+  private async _ingestPullData(data: WirePullResponse): Promise<void> {
+    await database.write(async () => {
+      const now = Date.now();
+
+      // ── user_profile ───────────────────────────────────────────────────────
+      if (data.user_profile) {
+        const p = data.user_profile;
+        const existing = await database.get<UserProfile>('user_profile')
+          .query(Q.where('external_id', p.id)).fetch();
+        if (existing.length > 0) {
+          await existing[0].update((r) => {
+            r.firstName = p.first_name;
+            r.lastName = p.last_name;
+            r.email = p.email;
+            r.phone = p.phone ?? null;
+            r.handicapIndex = p.handicap_index ?? null;
+            r.avatarUrl = p.avatar_url ?? null;
+            r.homeClubId = p.home_club_id ?? null;
+            r.licenseNumber = p.license_number ?? null;
+            r.syncedAt = now;
+          });
+        } else {
+          await database.get<UserProfile>('user_profile').create((r) => {
+            r.externalId = p.id;
+            r.firstName = p.first_name;
+            r.lastName = p.last_name;
+            r.email = p.email;
+            r.phone = p.phone ?? null;
+            r.handicapIndex = p.handicap_index ?? null;
+            r.avatarUrl = p.avatar_url ?? null;
+            r.homeClubId = p.home_club_id ?? null;
+            r.licenseNumber = p.license_number ?? null;
+            r.syncedAt = now;
+          });
+        }
+      }
+
+      // ── clubs ──────────────────────────────────────────────────────────────
+      for (const c of data.clubs ?? []) {
+        const existing = await database.get<ClubCache>('clubs_cache')
+          .query(Q.where('external_id', c.id)).fetch();
+        if (existing.length > 0) {
+          await existing[0].update((r) => {
+            r.name = c.name;
+            r.city = c.city ?? null;
+            r.country = c.country ?? null;
+            r.address = c.address ?? null;
+            r.phone = c.phone ?? null;
+            r.website = c.website ?? null;
+            r.logoUrl = c.logo_url ?? null;
+            r.syncedAt = now;
+          });
+        } else {
+          await database.get<ClubCache>('clubs_cache').create((r) => {
+            r.externalId = c.id;
+            r.name = c.name;
+            r.city = c.city ?? null;
+            r.country = c.country ?? null;
+            r.address = c.address ?? null;
+            r.phone = c.phone ?? null;
+            r.website = c.website ?? null;
+            r.logoUrl = c.logo_url ?? null;
+            r.syncedAt = now;
+          });
+        }
+      }
+
+      // ── courses + routes + holes ───────────────────────────────────────────
+      for (const wc of data.courses ?? []) {
+        let courseRecord: Course;
+        const existingCourses = await database.get<Course>('courses')
+          .query(Q.where('external_id', wc.id)).fetch();
+        if (existingCourses.length > 0) {
+          courseRecord = existingCourses[0];
+          await courseRecord.update((r) => {
+            r.name = wc.name;
+            r.clubId = wc.club_id ?? null;
+            r.city = wc.city ?? null;
+            r.country = wc.country ?? null;
+            r.syncedAt = now;
+          });
+        } else {
+          courseRecord = await database.get<Course>('courses').create((r) => {
+            r.externalId = wc.id;
+            r.name = wc.name;
+            r.clubId = wc.club_id ?? null;
+            r.city = wc.city ?? null;
+            r.country = wc.country ?? null;
+            r.syncedAt = now;
+          });
+        }
+
+        for (const wr of wc.routes) {
+          let routeRecord: Route;
+          const existingRoutes = await database.get<Route>('routes')
+            .query(Q.and(Q.where('course_id', courseRecord.id), Q.where('external_id', wr.id))).fetch();
+          if (existingRoutes.length > 0) {
+            routeRecord = existingRoutes[0];
+            await routeRecord.update((r) => {
+              r.name = wr.name;
+              r.numHoles = wr.num_holes;
+              r.parTotal = wr.par_total;
+              r.slope = wr.slope ?? null;
+              r.courseRating = wr.course_rating ?? null;
+              r.teeColor = wr.tee_color ?? null;
+              r.gender = wr.gender ?? null;
+              r.totalDistance = wr.total_distance ?? null;
+              r.syncedAt = now;
+            });
+          } else {
+            routeRecord = await database.get<Route>('routes').create((r) => {
+              r.externalId = wr.id;
+              r.courseId = courseRecord.id;
+              r.courseExternalId = wc.id;
+              r.name = wr.name;
+              r.numHoles = wr.num_holes;
+              r.parTotal = wr.par_total;
+              r.slope = wr.slope ?? null;
+              r.courseRating = wr.course_rating ?? null;
+              r.teeColor = wr.tee_color ?? null;
+              r.gender = wr.gender ?? null;
+              r.totalDistance = wr.total_distance ?? null;
+              r.syncedAt = now;
+            });
+          }
+
+          for (const wh of wr.holes) {
+            const existingHoles = await database.get<Hole>('holes')
+              .query(Q.and(Q.where('route_id', routeRecord.id), Q.where('hole_number', wh.number))).fetch();
+            if (existingHoles.length > 0) {
+              await existingHoles[0].update((r) => {
+                r.par = wh.par;
+                r.handicap = wh.handicap;
+                r.distanceMeters = wh.distance ?? null;
+                r.elevation = wh.elevation ?? null;
+                r.fairwayWidth = wh.fairway_width ?? null;
+                r.fairwayLength = wh.fairway_length ?? null;
+                r.fairwaySlope = wh.fairway_slope ?? null;
+                r.fairwaySlopePercentage = wh.fairway_slope_percentage ?? null;
+              });
+            } else {
+              await database.get<Hole>('holes').create((r) => {
+                r.routeId = routeRecord.id;
+                r.holeNumber = wh.number;
+                r.par = wh.par;
+                r.handicap = wh.handicap;
+                r.distanceMeters = wh.distance ?? null;
+                r.elevation = wh.elevation ?? null;
+                r.fairwayWidth = wh.fairway_width ?? null;
+                r.fairwayLength = wh.fairway_length ?? null;
+                r.fairwaySlope = wh.fairway_slope ?? null;
+                r.fairwaySlopePercentage = wh.fairway_slope_percentage ?? null;
+              });
+            }
+          }
+        }
+      }
+
+      // ── players_cache ──────────────────────────────────────────────────────
+      for (const p of data.players_cache ?? []) {
+        const existing = await database.get<PlayerCache>('players_cache')
+          .query(Q.where('external_id', p.external_id)).fetch();
+        if (existing.length > 0) {
+          await existing[0].update((r) => {
+            r.firstName = p.first_name;
+            r.lastName = p.last_name;
+            r.license = p.license ?? null;
+            r.handicapIndex = p.handicap_index ?? null;
+            r.avatarUrl = p.avatar_url ?? null;
+            r.syncedAt = now;
+          });
+        } else {
+          await database.get<PlayerCache>('players_cache').create((r) => {
+            r.externalId = p.external_id;
+            r.firstName = p.first_name;
+            r.lastName = p.last_name;
+            r.license = p.license ?? null;
+            r.handicapIndex = p.handicap_index ?? null;
+            r.avatarUrl = p.avatar_url ?? null;
+            r.syncedAt = now;
+          });
+        }
+      }
+
+      // ── tour_events (inside datasets envelope) ─────────────────────────────
+      for (const e of data.datasets?.tour_events ?? []) {
+        const existing = await database.get<TourEvent>('tour_events')
+          .query(Q.where('external_id', e.id)).fetch();
+        if (existing.length > 0) {
+          await existing[0].update((r) => {
+            r.competitionName = e.competition_name;
+            r.eventName = e.event_name;
+            r.date = e.date;
+            r.teeTime = e.tee_time ?? null;
+            r.format = (e.format as TourEvent['format']) ?? null;
+            r.status = e.status as TourEvent['status'];
+            r.groupCode = e.group_code ?? null;
+            r.courseName = e.course_name ?? null;
+            r.routeName = e.route_name ?? null;
+            r.syncedAt = now;
+          });
+        } else {
+          await database.get<TourEvent>('tour_events').create((r) => {
+            r.externalId = e.id;
+            r.competitionName = e.competition_name;
+            r.eventName = e.event_name;
+            r.date = e.date;
+            r.teeTime = e.tee_time ?? null;
+            r.format = (e.format as TourEvent['format']) ?? null;
+            r.status = e.status as TourEvent['status'];
+            r.groupCode = e.group_code ?? null;
+            r.courseName = e.course_name ?? null;
+            r.routeName = e.route_name ?? null;
+            r.syncedAt = now;
+          });
+        }
+      }
+    });
   }
 
   // ─── Iniciar flush periódico + pull + reconexión ──────────────────────────
