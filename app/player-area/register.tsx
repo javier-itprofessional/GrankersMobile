@@ -1,13 +1,59 @@
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView, Alert, Modal, FlatList } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { UserPlus, Mail, Globe, FileText, ChevronRight, Check, CheckCircle } from 'lucide-react-native';
+import { UserPlus, Mail, Globe, FileText, ChevronRight, Check, CheckCircle, ChevronDown, X } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { FontFamily } from '@/constants/Typography';
 import { usePlayerAuth } from '@/providers/PlayerAuthProvider';
 import { register, loginWithGoogle } from '@/services/auth';
+
+const COUNTRIES: { code: string; name: string }[] = [
+  { code: 'ES', name: 'España' },
+  { code: 'AR', name: 'Argentina' },
+  { code: 'MX', name: 'México' },
+  { code: 'CO', name: 'Colombia' },
+  { code: 'CL', name: 'Chile' },
+  { code: 'PE', name: 'Perú' },
+  { code: 'UY', name: 'Uruguay' },
+  { code: 'VE', name: 'Venezuela' },
+  { code: 'EC', name: 'Ecuador' },
+  { code: 'BO', name: 'Bolivia' },
+  { code: 'PY', name: 'Paraguay' },
+  { code: 'CR', name: 'Costa Rica' },
+  { code: 'PA', name: 'Panamá' },
+  { code: 'DO', name: 'República Dominicana' },
+  { code: 'GT', name: 'Guatemala' },
+  { code: 'PT', name: 'Portugal' },
+  { code: 'GB', name: 'Reino Unido' },
+  { code: 'FR', name: 'Francia' },
+  { code: 'DE', name: 'Alemania' },
+  { code: 'IT', name: 'Italia' },
+  { code: 'NL', name: 'Países Bajos' },
+  { code: 'BE', name: 'Bélgica' },
+  { code: 'CH', name: 'Suiza' },
+  { code: 'AT', name: 'Austria' },
+  { code: 'SE', name: 'Suecia' },
+  { code: 'NO', name: 'Noruega' },
+  { code: 'DK', name: 'Dinamarca' },
+  { code: 'FI', name: 'Finlandia' },
+  { code: 'IE', name: 'Irlanda' },
+  { code: 'PL', name: 'Polonia' },
+  { code: 'CZ', name: 'República Checa' },
+  { code: 'RO', name: 'Rumanía' },
+  { code: 'HU', name: 'Hungría' },
+  { code: 'GR', name: 'Grecia' },
+  { code: 'US', name: 'Estados Unidos' },
+  { code: 'CA', name: 'Canadá' },
+  { code: 'AU', name: 'Australia' },
+  { code: 'NZ', name: 'Nueva Zelanda' },
+  { code: 'JP', name: 'Japón' },
+  { code: 'KR', name: 'Corea del Sur' },
+  { code: 'ZA', name: 'Sudáfrica' },
+  { code: 'AE', name: 'Emiratos Árabes' },
+  { code: 'SG', name: 'Singapur' },
+];
 
 export default function RegisterScreen() {
   const insets = useSafeAreaInsets();
@@ -17,9 +63,12 @@ export default function RegisterScreen() {
   const [firstName, setFirstName] = useState<string>('');
   const [lastName, setLastName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
-  const [country, setCountry] = useState<string>('');
+  const [countryCode, setCountryCode] = useState<string>('');
+  const [showCountryPicker, setShowCountryPicker] = useState<boolean>(false);
   const [acceptedTerms, setAcceptedTerms] = useState<boolean>(false);
   const [registered, setRegistered] = useState<boolean>(false);
+
+  const selectedCountryName = COUNTRIES.find((c) => c.code === countryCode)?.name ?? '';
 
   const googleRegisterMutation = useMutation({
     mutationFn: async () => {
@@ -42,14 +91,14 @@ export default function RegisterScreen() {
       if (!email.trim()) throw new Error('Por favor, introduce tu correo electrónico');
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email.trim())) throw new Error('Por favor, introduce un correo electrónico válido');
-      if (!country.trim()) throw new Error('Por favor, introduce tu país de residencia');
+      if (!countryCode) throw new Error('Por favor, selecciona tu país de residencia');
       if (!acceptedTerms) throw new Error('Debes aceptar los términos de uso y la política de privacidad');
 
       await register({
         email: email.trim(),
         first_name: firstName.trim(),
         last_name: lastName.trim(),
-        country: country.trim(),
+        country: countryCode,
       });
     },
     onSuccess: () => {
@@ -60,7 +109,7 @@ export default function RegisterScreen() {
     },
   });
 
-  const isFormValid = firstName.trim() && lastName.trim() && email.trim() && country.trim() && acceptedTerms;
+  const isFormValid = firstName.trim() && lastName.trim() && email.trim() && countryCode && acceptedTerms;
 
   if (registered) {
     return (
@@ -196,18 +245,18 @@ export default function RegisterScreen() {
 
             <View style={styles.inputGroup}>
               <Text style={styles.fieldLabel}>País de residencia</Text>
-              <View style={styles.inputWrapper}>
+              <TouchableOpacity
+                style={styles.inputWrapper}
+                onPress={() => setShowCountryPicker(true)}
+                activeOpacity={0.7}
+                testID="register-country-picker"
+              >
                 <Globe size={18} color={Colors.golf.textLight} />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="España"
-                  placeholderTextColor="#AAAAAA"
-                  value={country}
-                  onChangeText={setCountry}
-                  autoCapitalize="words"
-                  testID="register-country-input"
-                />
-              </View>
+                <Text style={[styles.textInput, styles.pickerText, !countryCode && styles.pickerPlaceholder]}>
+                  {selectedCountryName || 'Selecciona tu país'}
+                </Text>
+                <ChevronDown size={18} color={Colors.golf.textLight} />
+              </TouchableOpacity>
             </View>
 
             <TouchableOpacity
@@ -259,6 +308,41 @@ export default function RegisterScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={showCountryPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCountryPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>País de residencia</Text>
+              <TouchableOpacity onPress={() => setShowCountryPicker(false)} testID="close-country-picker">
+                <X size={22} color={Colors.golf.textLight} />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={COUNTRIES}
+              keyExtractor={(item) => item.code}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.countryItem, countryCode === item.code && styles.countryItemSelected]}
+                  onPress={() => { setCountryCode(item.code); setShowCountryPicker(false); }}
+                  testID={`country-item-${item.code}`}
+                >
+                  <Text style={styles.countryCode}>{item.code}</Text>
+                  <Text style={[styles.countryName, countryCode === item.code && styles.countryNameSelected]}>
+                    {item.name}
+                  </Text>
+                  {countryCode === item.code && <Check size={18} color={Colors.golf.primary} strokeWidth={3} />}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -553,5 +637,69 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
     color: Colors.golf.primary,
     textDecorationLine: 'underline' as const,
+  },
+  pickerText: {
+    flex: 1,
+    paddingVertical: 13,
+  },
+  pickerPlaceholder: {
+    color: '#AAAAAA',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '70%',
+    paddingBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.golf.border,
+  },
+  modalTitle: {
+    fontFamily: FontFamily.bodySemi,
+    fontSize: 17,
+    fontWeight: '600' as const,
+    color: Colors.golf.text,
+  },
+  countryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.golf.border,
+    gap: 12,
+  },
+  countryItemSelected: {
+    backgroundColor: Colors.golf.primary + '10',
+  },
+  countryCode: {
+    fontFamily: FontFamily.bodySemi,
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: Colors.golf.textLight,
+    width: 32,
+  },
+  countryName: {
+    fontFamily: FontFamily.body,
+    fontSize: 15,
+    color: Colors.golf.text,
+    flex: 1,
+  },
+  countryNameSelected: {
+    fontFamily: FontFamily.bodySemi,
+    fontWeight: '600' as const,
+    color: Colors.golf.primary,
   },
 });
