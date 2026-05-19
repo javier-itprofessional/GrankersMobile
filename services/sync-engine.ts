@@ -288,8 +288,10 @@ export class SyncEngine {
         since = watermark;
         hasMore = data.has_more ?? false;
       }
-    } catch {
-      // Network error — will retry on next interval
+    } catch (e) {
+      if (e instanceof Error && e.message !== 'SESSION_EXPIRED') {
+        console.error('[SyncEngine] pull() error:', e);
+      }
     } finally {
       this.isPulling = false;
     }

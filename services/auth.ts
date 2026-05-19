@@ -94,15 +94,15 @@ export async function register(params: {
 }
 
 export async function logout(): Promise<void> {
-  try {
-    const refreshToken = await AuthStorage.getRefreshToken();
-    if (refreshToken) {
-      await apiRequest('/api/v1/auth/mobile/logout/', {
-        method: 'POST',
-        body: JSON.stringify({ refresh: refreshToken }),
-      });
-    }
-  } finally {
-    await AuthStorage.clear();
+  // Clear local tokens immediately — don't block on the server call.
+  // Server-side token invalidation is best-effort; a slow/offline server
+  // should never prevent the user from logging out of the app.
+  const refreshToken = await AuthStorage.getRefreshToken();
+  await AuthStorage.clear();
+  if (refreshToken) {
+    apiRequest('/api/v1/auth/mobile/logout/', {
+      method: 'POST',
+      body: JSON.stringify({ refresh: refreshToken }),
+    }).catch(() => {});
   }
 }

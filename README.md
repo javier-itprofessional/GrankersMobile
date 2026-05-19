@@ -158,6 +158,32 @@ Alternative web deployment options:
 - **Vercel**: Deploy directly from your GitHub repository
 - **Netlify**: Connect your GitHub repo to Netlify for automatic deployments
 
+## Architecture & Performance
+
+### Course catalog (in-memory, instant)
+
+The course/route selector loads from an in-memory `Map` populated synchronously at app start from a bundled JSON seed (`assets/seed/courses.json`). Zero network calls, zero DB queries — **response time: 0 ms**.
+
+On login, `refreshCourseCatalog()` runs in the background: fetches `GET /api/v1/courses/`, updates the in-memory maps, and persists hole data to WatermelonDB for offline gameplay. The UI is never blocked.
+
+To regenerate the seed (requires Docker + running backend):
+
+```bash
+docker compose --project-name grankers --file docker/docker-compose-dev.yml \
+  exec -T grankers-app python3 manage.py export_course_seed \
+  2>/dev/null > assets/seed/courses.json
+```
+
+See [backend.todo.md](backend.todo.md) for full instructions.
+
+### WatermelonDB
+
+WatermelonDB (0.28.0) without JSI serializes reads and writes on a single async queue. To avoid blocking the UI, all `database.batch()` calls for course data run as fire-and-forget background tasks. The course-selection UI path never touches the DB.
+
+### Logout
+
+Tokens are cleared locally first (immediate UX response). The server-side invalidation call runs in the background and is best-effort.
+
 ## App Features
 
 This template includes:
