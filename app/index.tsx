@@ -3,6 +3,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   ActivityIndicator,
   Alert,
   Animated,
@@ -412,11 +413,15 @@ export default function WelcomeScreen() {
               }],
             }}
           >
-            <TouchableOpacity
-              style={[styles.menuCard, item.disabled && styles.menuCardDisabled]}
+            <Pressable
+              style={({ pressed }) => [
+                styles.menuCard,
+                item.disabled && styles.menuCardDisabled,
+                pressed && styles.menuCardPressed,
+              ]}
               onPress={item.onPress}
               disabled={item.disabled}
-              activeOpacity={0.7}
+              android_ripple={{ color: 'rgba(0,0,0,0.08)', borderless: false }}
               testID={item.testID}
             >
               <View style={styles.menuIconWrap}>
@@ -427,7 +432,7 @@ export default function WelcomeScreen() {
                 <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
               </View>
               <ChevronRight size={20} color={Colors.golf.border} />
-            </TouchableOpacity>
+            </Pressable>
           </Animated.View>
         ))}
 
@@ -682,6 +687,9 @@ const styles = StyleSheet.create({
   },
   menuCardDisabled: {
     opacity: 0.6,
+  },
+  menuCardPressed: {
+    backgroundColor: '#F0F0F0',
   },
   menuIconWrap: {
     width: 48,

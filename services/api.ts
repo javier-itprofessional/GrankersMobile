@@ -33,6 +33,7 @@ async function refreshTokens(): Promise<boolean> {
 export async function apiRequest<T = any>(
   path: string,
   options: RequestInit = {},
+  timeoutMs = 10_000,
 ): Promise<T> {
   const deviceId = await getDeviceId();
   let accessToken = await AuthStorage.getAccessToken();
@@ -50,14 +51,28 @@ export async function apiRequest<T = any>(
   };
   if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
-  let response = await fetch(`${API_URL}${path}`, { ...options, headers });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, { ...options, headers, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (response.status === 401) {
     const refreshed = await refreshTokens();
     if (!refreshed) throw new Error('SESSION_EXPIRED');
     accessToken = await AuthStorage.getAccessToken();
     headers['Authorization'] = `Bearer ${accessToken}`;
-    response = await fetch(`${API_URL}${path}`, { ...options, headers });
+    const controller2 = new AbortController();
+    const timer2 = setTimeout(() => controller2.abort(), timeoutMs);
+    try {
+      response = await fetch(`${API_URL}${path}`, { ...options, headers, signal: controller2.signal });
+    } finally {
+      clearTimeout(timer2);
+    }
   }
 
   if (!response.ok) {

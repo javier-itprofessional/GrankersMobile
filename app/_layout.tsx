@@ -12,6 +12,7 @@ import { PlayerAuthContext, usePlayerAuth } from "../providers/PlayerAuthProvide
 import { configureGoogleSignIn } from "../services/auth";
 import { verifyMagicLink } from "../services/auth";
 import { syncEngine } from "../services/sync-engine";
+import { refreshCourseCatalog } from "../services/course-service";
 import {
   useFonts,
   DMSans_400Regular,
@@ -37,7 +38,9 @@ function SyncBootstrap() {
   useEffect(() => {
     if (isAuthenticated && !didPull.current) {
       didPull.current = true;
+      // Both run in parallel, independently — neither blocks the UI
       syncEngine.pull().catch(() => {});
+      refreshCourseCatalog().catch(() => {});
     }
     if (!isAuthenticated) {
       didPull.current = false;
