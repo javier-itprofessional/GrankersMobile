@@ -2,15 +2,16 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as Linking from "expo-linking";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { DatabaseProvider } from "@nozbe/watermelondb/react";
 import { database } from "../database";
 import { CompetitionProvider } from "../providers/CompetitionProvider";
 import { FreePlayProvider } from "../providers/FreePlayProvider";
-import { PlayerAuthContext } from "../providers/PlayerAuthProvider";
+import { PlayerAuthContext, usePlayerAuth } from "../providers/PlayerAuthProvider";
 import { configureGoogleSignIn } from "../services/auth";
 import { verifyMagicLink } from "../services/auth";
+import { syncEngine } from "../services/sync-engine";
 import {
   useFonts,
   DMSans_400Regular,
@@ -28,6 +29,23 @@ import {
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
+
+function SyncBootstrap() {
+  const { isAuthenticated } = usePlayerAuth();
+  const didPull = useRef(false);
+
+  useEffect(() => {
+    if (isAuthenticated && !didPull.current) {
+      didPull.current = true;
+      syncEngine.pull().catch(() => {});
+    }
+    if (!isAuthenticated) {
+      didPull.current = false;
+    }
+  }, [isAuthenticated]);
+
+  return null;
+}
 
 function RootLayoutNav() {
   return (
@@ -113,6 +131,7 @@ export default function RootLayout() {
     <DatabaseProvider database={database}>
       <QueryClientProvider client={queryClient}>
         <PlayerAuthContext>
+          <SyncBootstrap />
           <CompetitionProvider>
             <FreePlayProvider>
               <GestureHandlerRootView style={{ flex: 1 }}>
