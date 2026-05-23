@@ -12,7 +12,7 @@ import { PlayerAuthContext, usePlayerAuth } from "../providers/PlayerAuthProvide
 import { configureGoogleSignIn } from "../services/auth";
 import { verifyMagicLink } from "../services/auth";
 import { syncEngine } from "../services/sync-engine";
-import { refreshCourseCatalog } from "../services/course-service";
+import { refreshCourseCatalog, seedDatabaseIfEmpty } from "../services/course-service";
 import {
   useFonts,
   DMSans_400Regular,
@@ -89,6 +89,10 @@ export default function RootLayout() {
 
   useEffect(() => {
     configureGoogleSignIn();
+  }, []);
+
+  useEffect(() => {
+    seedDatabaseIfEmpty().catch(() => {});
   }, []);
 
   useEffect(() => {

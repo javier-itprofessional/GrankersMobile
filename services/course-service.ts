@@ -204,9 +204,23 @@ function _kickOffPersist(courses: CourseData[]): void {
   });
 }
 
+// Full replace: deletes all existing courses/routes/holes then recreates from
+// the provided data. Safe to call multiple times (seed + refresh on login).
 async function _doBulkPersist(courses: CourseData[]): Promise<void> {
   const now = Date.now();
-  const ops: Parameters<typeof database.batch>[0][] = [];
+
+  // Reads must happen before the write transaction (WatermelonDB constraint)
+  const [existingCourses, existingRoutes, existingHoles] = await Promise.all([
+    database.get<Course>('courses').query().fetch(),
+    database.get<Route>('routes').query().fetch(),
+    database.get<Hole>('holes').query().fetch(),
+  ]);
+
+  const ops: Parameters<typeof database.batch>[0][] = [
+    ...existingHoles.map((h) => h.prepareDestroyPermanently()),
+    ...existingRoutes.map((r) => r.prepareDestroyPermanently()),
+    ...existingCourses.map((c) => c.prepareDestroyPermanently()),
+  ];
 
   for (const courseData of courses) {
     const coursePrepared = database.get<Course>('courses').prepareCreate((r) => {
@@ -259,6 +273,16 @@ async function _doBulkPersist(courses: CourseData[]): Promise<void> {
   if (ops.length > 0) {
     await database.write(() => database.batch(...ops));
   }
+}
+
+// Called once at app startup (before login). Seeds WatermelonDB from the
+// bundled JSON so hole data is available for gameplay without network access.
+export async function seedDatabaseIfEmpty(): Promise<void> {
+  const seed = SEED_JSON as unknown as WireCourseData[];
+  if (seed.length === 0) return;
+  const count = await database.get<Course>('courses').query().fetchCount();
+  if (count > 0) return;
+  await _doBulkPersist(seed.map(transformCourse));
 }
 
 // ─── Gameplay data (hole-level, uses WatermelonDB cache) ─────────────────────
