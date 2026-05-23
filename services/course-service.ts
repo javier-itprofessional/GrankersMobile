@@ -204,56 +204,119 @@ function _kickOffPersist(courses: CourseData[]): void {
   });
 }
 
-// Full replace: deletes all existing courses/routes/holes then recreates from
-// the provided data. Safe to call multiple times (seed + refresh on login).
+// Upsert: updates existing courses/routes (matched by external_id) and inserts
+// new ones. Never deletes records absent from the incoming data, so a partial
+// seed doesn't wipe courses already in the DB.
 async function _doBulkPersist(courses: CourseData[]): Promise<void> {
   const now = Date.now();
+  const incomingCourseIds = courses.map((c) => c.id);
 
-  // Reads must happen before the write transaction (WatermelonDB constraint)
-  const [existingCourses, existingRoutes, existingHoles] = await Promise.all([
-    database.get<Course>('courses').query().fetch(),
-    database.get<Route>('routes').query().fetch(),
-    database.get<Hole>('holes').query().fetch(),
-  ]);
+  // ── Phase 1: fetch existing records (reads before write transaction) ────────
+  const existingCourses = await database.get<Course>('courses')
+    .query(Q.where('external_id', Q.oneOf(incomingCourseIds))).fetch();
+  const existingCourseMap = new Map(existingCourses.map((c) => [c.externalId, c]));
 
-  const ops: Parameters<typeof database.batch>[0][] = [
-    ...existingHoles.map((h) => h.prepareDestroyPermanently()),
-    ...existingRoutes.map((r) => r.prepareDestroyPermanently()),
-    ...existingCourses.map((c) => c.prepareDestroyPermanently()),
-  ];
+  const existingRoutes = existingCourses.length > 0
+    ? await database.get<Route>('routes')
+        .query(Q.where('course_id', Q.oneOf(existingCourses.map((c) => c.id)))).fetch()
+    : [];
+  const routesByCourseId = new Map<string, Route[]>();
+  for (const r of existingRoutes) {
+    if (!routesByCourseId.has(r.courseId)) routesByCourseId.set(r.courseId, []);
+    routesByCourseId.get(r.courseId)!.push(r);
+  }
+
+  const existingHoles = existingRoutes.length > 0
+    ? await database.get<Hole>('holes')
+        .query(Q.where('route_id', Q.oneOf(existingRoutes.map((r) => r.id)))).fetch()
+    : [];
+  const holesByRouteId = new Map<string, Hole[]>();
+  for (const h of existingHoles) {
+    if (!holesByRouteId.has(h.routeId)) holesByRouteId.set(h.routeId, []);
+    holesByRouteId.get(h.routeId)!.push(h);
+  }
+
+  // ── Phase 2: build batch ops ──────────────────────────────────────────────
+  const ops: Parameters<typeof database.batch>[0][] = [];
 
   for (const courseData of courses) {
-    const coursePrepared = database.get<Course>('courses').prepareCreate((r) => {
-      r.externalId = courseData.id;
-      r.name = courseData.name;
-      r.clubId = courseData.clubId ?? null;
-      r.city = courseData.city ?? null;
-      r.country = courseData.country ?? null;
-      r.syncedAt = now;
-    });
-    ops.push(coursePrepared);
+    const existingCourse = existingCourseMap.get(courseData.id);
+    let courseId: string;
 
-    for (const routeData of courseData.routes) {
-      const routePrepared = database.get<Route>('routes').prepareCreate((r) => {
-        r.externalId = routeData.externalId ?? null;
-        r.courseId = coursePrepared.id;
-        r.courseExternalId = courseData.id;
-        r.name = routeData.name;
-        r.numHoles = routeData.num_holes;
-        r.parTotal = routeData.par_total;
-        r.slope = routeData.slope ?? null;
-        r.courseRating = routeData.course_rating ?? null;
-        r.teeColor = routeData.teeColor ?? null;
-        r.gender = routeData.gender ?? null;
-        r.totalDistance = routeData.totalDistance ?? null;
+    if (existingCourse) {
+      ops.push(existingCourse.prepareUpdate((r) => {
+        r.name = courseData.name;
+        r.clubId = courseData.clubId ?? null;
+        r.city = courseData.city ?? null;
+        r.country = courseData.country ?? null;
+        r.syncedAt = now;
+      }));
+      courseId = existingCourse.id;
+    } else {
+      const created = database.get<Course>('courses').prepareCreate((r) => {
+        r.externalId = courseData.id;
+        r.name = courseData.name;
+        r.clubId = courseData.clubId ?? null;
+        r.city = courseData.city ?? null;
+        r.country = courseData.country ?? null;
         r.syncedAt = now;
       });
-      ops.push(routePrepared);
+      ops.push(created);
+      courseId = created.id;
+    }
+
+    const courseRoutes = existingCourse ? (routesByCourseId.get(existingCourse.id) ?? []) : [];
+    const existingRouteByExtId = new Map(
+      courseRoutes.filter((r) => r.externalId).map((r) => [r.externalId!, r])
+    );
+
+    for (const routeData of courseData.routes) {
+      const existingRoute = routeData.externalId
+        ? existingRouteByExtId.get(routeData.externalId)
+        : courseRoutes.find((r) => r.name === routeData.name);
+
+      let routeId: string;
+
+      if (existingRoute) {
+        // Replace holes: delete old, create new
+        for (const h of holesByRouteId.get(existingRoute.id) ?? []) {
+          ops.push(h.prepareDestroyPermanently());
+        }
+        ops.push(existingRoute.prepareUpdate((r) => {
+          r.name = routeData.name;
+          r.numHoles = routeData.num_holes;
+          r.parTotal = routeData.par_total;
+          r.slope = routeData.slope ?? null;
+          r.courseRating = routeData.course_rating ?? null;
+          r.teeColor = routeData.teeColor ?? null;
+          r.gender = routeData.gender ?? null;
+          r.totalDistance = routeData.totalDistance ?? null;
+          r.syncedAt = now;
+        }));
+        routeId = existingRoute.id;
+      } else {
+        const created = database.get<Route>('routes').prepareCreate((r) => {
+          r.externalId = routeData.externalId ?? null;
+          r.courseId = courseId;
+          r.courseExternalId = courseData.id;
+          r.name = routeData.name;
+          r.numHoles = routeData.num_holes;
+          r.parTotal = routeData.par_total;
+          r.slope = routeData.slope ?? null;
+          r.courseRating = routeData.course_rating ?? null;
+          r.teeColor = routeData.teeColor ?? null;
+          r.gender = routeData.gender ?? null;
+          r.totalDistance = routeData.totalDistance ?? null;
+          r.syncedAt = now;
+        });
+        ops.push(created);
+        routeId = created.id;
+      }
 
       for (const hole of routeData.holes) {
         ops.push(
           database.get<Hole>('holes').prepareCreate((h) => {
-            h.routeId = routePrepared.id;
+            h.routeId = routeId;
             h.holeNumber = hole.hole_number;
             h.par = hole.par;
             h.handicap = hole.handicap;
