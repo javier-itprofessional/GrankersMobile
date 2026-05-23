@@ -205,6 +205,35 @@ El handler está cableado. El publisher Celery ya activo.
 
 ---
 
+## §8 — Pendientes de backend (2026-05)
+
+### ⬜ 8.a — `playing_handicap` y `tee_color` en endpoint de jugadores del grupo
+
+**Fichero backend:** `grankers-backend/src/api/v1/views/competitions.py`  
+**Detalle completo:** `backend.todo.md` → sección "Exponer playing_handicap y tee_color"
+
+`_serialize_competition_player` solo devuelve `id`, `first_name`, `last_name`, `license`. Falta:
+- `playing_handicap` — desde `ScoringSessionPlayer` si existe, fallback a `user_license.handicap`
+- `tee_color` — desde `ScoringSessionPlayer` si existe, fallback a `TourCategory.tee_color`
+
+**Impacto mobile:** Actualmente se muestra `userLicenses[0].handicap` (HCP de la licencia actual, no el playing handicap ajustado al campo). Una vez implementado, `code-entry.tsx` usará `player.playing_handicap` desde la respuesta de la API y se añade `tee_color?: string` a `FirebaseCompetitionData` en `types/game.ts`.
+
+### ⬜ 8.b — Generar seed de campos de golf
+
+**Detalle completo:** `backend.todo.md` → sección "Generar seed de campos de golf"
+
+`assets/seed/courses.json` está vacío (`[]`). Ejecutar:
+
+```bash
+docker compose --project-name grankers --file docker/docker-compose-dev.yml \
+  exec -T grankers-app python3 manage.py export_course_seed \
+  2>/dev/null > assets/seed/courses.json
+```
+
+Tras generar: commit + `bunx expo run:android` para bundlear el JSON.
+
+---
+
 ## Historial de respuestas del backend (2026-04-23)
 
 1. **Routes model** — `Route` es una entidad de primer nivel (scorecard variant por tee + género). `TourEventStartTime` = scheduling. No son sinónimos.
