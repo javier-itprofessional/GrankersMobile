@@ -24,6 +24,8 @@ import { usePlayerAuth } from '../providers/PlayerAuthProvider';
 import { loginWithGoogle } from '../services/auth';
 import { findCompetitionByDeviceId, getPlayerHoleScores } from '../services/game-service';
 import type { FoundCompetitionSession } from '../services/game-service';
+import { useBackendStatus } from '../hooks/useBackendStatus';
+import ConnectionStatus from '../components/ConnectionStatus';
 
 type Screen = 'landing' | 'menu';
 
@@ -32,7 +34,8 @@ export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
   const { isLoaded: compLoaded, competition, currentScreen, deviceId, startCompetition, setDevicePlayerId, setScoringModeAndPlayers, goToHole, resetCompetition } = useCompetition();
   const { gameStarted, isLoaded: freePlayLoaded, currentScreen: freePlayScreen } = useFreePlay();
-  const { isAuthenticated, isLoading: authLoading, reloadSession, clearSession } = usePlayerAuth();
+  const { session, isAuthenticated, isLoading: authLoading, reloadSession, clearSession } = usePlayerAuth();
+  const backendStatus = useBackendStatus();
   const [screen, setScreen] = useState<Screen>('landing');
 
   const googleMutation = useMutation({
@@ -386,7 +389,21 @@ export default function WelcomeScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.heroSection, { paddingTop: Math.max(insets.top + 20, 60) }]}>
+      <View style={styles.heroSection}>
+        {/* User info + connectivity status */}
+        <View style={[styles.heroTopBar, { paddingTop: Math.max(insets.top + 8, 44) }]}>
+          {isAuthenticated && session?.name ? (
+            <View style={styles.userRow}>
+              <User size={13} color="rgba(255,255,255,0.65)" strokeWidth={2} />
+              <Text style={styles.userName} numberOfLines={1}>{session.name}</Text>
+            </View>
+          ) : (
+            <View />
+          )}
+          <ConnectionStatus status={backendStatus} />
+        </View>
+
+        {/* Logo + tagline */}
         <Animated.View style={[styles.heroContent, { opacity: menuFadeAnim, transform: [{ translateY: menuSlideAnim }] }]}>
           <Image
             source={require('../assets/images/grankers-logo.png')}
@@ -639,6 +656,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
+  },
+  heroTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  userRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+    marginRight: 12,
+  },
+  userName: {
+    fontFamily: FontFamily.bodySemi,
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: 'rgba(255,255,255,0.85)',
+    flexShrink: 1,
   },
   heroContent: {
     alignItems: 'center',
