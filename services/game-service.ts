@@ -106,6 +106,14 @@ interface WireLicensePlayer {
   avatar_url?: string | null;
 }
 
+interface WireHandicapLookup {
+  full_name: string;
+  handicap: number;
+  license_number: string;
+  status: string;
+  last_handicap_update: string | null;
+}
+
 interface WireScoringSession {
   uuid: string;
   mode: string;
@@ -233,6 +241,15 @@ export function subscribeToCompetitionPlayers(
 
 // ─── Players / licenses ───────────────────────────────────────────────────────
 
+// RFEG full_name format: "APELLIDO APELLIDO, NOMBRE" → split on first comma
+function parseRfegFullName(fullName: string): { firstName: string; lastName: string } {
+  const commaIdx = fullName.indexOf(',');
+  if (commaIdx === -1) return { firstName: '', lastName: fullName.trim() };
+  const lastName = fullName.slice(0, commaIdx).trim();
+  const firstName = fullName.slice(commaIdx + 1).trim();
+  return { firstName, lastName };
+}
+
 export async function searchPlayerLicenses(
   searchParams: { license?: string; firstName?: string; lastName?: string; groupCode?: string }
 ): Promise<LicensePlayer[]> {
@@ -240,20 +257,41 @@ export async function searchPlayerLicenses(
   if (searchParams.license) params.set('license', searchParams.license);
   if (searchParams.firstName) params.set('first_name', searchParams.firstName);
   if (searchParams.lastName) params.set('last_name', searchParams.lastName);
-  if (searchParams.groupCode) params.set('group_code', searchParams.groupCode);
 
-  try {
-    const wire = await apiRequest<WireLicensePlayer[]>(`/api/v1/players/search/?${params.toString()}`);
-    return wire.map((w) => ({
+  // DB search (registered Grankers users) and RFEG lookup run in parallel
+  const dbSearch = apiRequest<WireLicensePlayer[]>(`/api/v1/players/search/?${params.toString()}`)
+    .then((wire) => wire.map((w): LicensePlayer => ({
       license: w.license,
       firstName: w.first_name,
       lastName: w.last_name,
       handicap: w.handicap_index,
       avatarUrl: w.avatar_url,
-    }));
-  } catch {
-    return [];
+    })))
+    .catch((): LicensePlayer[] => []);
+
+  // Only call check_handicap when a license number is provided (public endpoint, no auth needed)
+  const rfegLookup: Promise<LicensePlayer | null> = searchParams.license
+    ? apiRequest<WireHandicapLookup>(
+        `/api/v1/user/check_handicap/?license=${encodeURIComponent(searchParams.license)}&federation=RFEG`
+      )
+        .then((w): LicensePlayer => {
+          const { firstName, lastName } = parseRfegFullName(w.full_name);
+          return { license: w.license_number, firstName, lastName, handicap: w.handicap };
+        })
+        .catch((): null => null)
+    : Promise.resolve(null);
+
+  const [dbResults, rfegResult] = await Promise.all([dbSearch, rfegLookup]);
+
+  // Merge: DB results take priority. Add RFEG result only if license not already in DB results.
+  if (rfegResult) {
+    const dbLicenses = new Set(dbResults.map((p) => p.license?.toUpperCase()));
+    if (!dbLicenses.has(rfegResult.license?.toUpperCase())) {
+      dbResults.push(rfegResult);
+    }
   }
+
+  return dbResults;
 }
 
 // ─── Free-play games ──────────────────────────────────────────────────────────
