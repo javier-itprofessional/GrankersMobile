@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as Linking from "expo-linking";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { DatabaseProvider } from "@nozbe/watermelondb/react";
 import { database } from "../database";
@@ -86,20 +86,27 @@ export default function RootLayout() {
     Barlow_700Bold,
     Barlow_800ExtraBold,
   });
+  const [dbReady, setDbReady] = useState(false);
 
   useEffect(() => {
     configureGoogleSignIn();
   }, []);
 
+  // Seed WatermelonDB from bundled JSON on first install (fully offline).
+  // Runs once; on subsequent launches the count check exits immediately.
   useEffect(() => {
-    seedDatabaseIfEmpty().catch(() => {});
+    seedDatabaseIfEmpty()
+      .catch(() => {})
+      .finally(() => setDbReady(true));
   }, []);
 
+  // Keep the splash screen until both fonts and the DB seed are ready so the
+  // app never shows UI without hole data available offline.
   useEffect(() => {
-    if (fontsLoaded) {
+    if (fontsLoaded && dbReady) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, dbReady]);
 
   useEffect(() => {
     const handleDeepLink = async (url: string) => {
@@ -132,7 +139,7 @@ export default function RootLayout() {
     return () => subscription.remove();
   }, []);
 
-  if (!fontsLoaded) return null;
+  if (!fontsLoaded || !dbReady) return null;
 
   return (
     <DatabaseProvider database={database}>
