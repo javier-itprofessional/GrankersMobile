@@ -101,7 +101,7 @@ export default function CodeEntryScreen() {
         firstName: p.first_name,
         lastName: p.last_name,
         license: p.license,
-        handicap: p.handicap,
+        handicap: p.playing_handicap,
       })),
     };
     startCompetition(comp);
@@ -109,6 +109,16 @@ export default function CodeEntryScreen() {
       pathname: '/competition/select-player',
       params: { competitionData: JSON.stringify(competitionData) },
     });
+  };
+
+  // ─── Tee color map ────────────────────────────────────────────────────────────
+
+  const TEE_COLOR_HEX: Record<string, string> = {
+    yellow: '#FBBF24',
+    blue:   '#3B82F6',
+    red:    '#EF4444',
+    white:  '#E5E7EB',
+    black:  '#374151',
   };
 
   // ─── Rendered regions ────────────────────────────────────────────────────────
@@ -197,6 +207,10 @@ export default function CodeEntryScreen() {
   // ── State B: group loaded — show group details + Listo ────────────────────────
 
   if (competitionData) {
+    const myPlayer = myIndex >= 0 ? enrichedPlayers[myIndex] : null;
+    const myPlayingHandicap = myPlayer?.playing_handicap ?? playerHandicap;
+    const myTeeColor = myPlayer?.tee_color;
+
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
         <Stack.Screen options={{ title: 'Competición', headerStyle: { backgroundColor: Colors.golf.headerBg }, headerTintColor: '#fff' }} />
@@ -212,10 +226,17 @@ export default function CodeEntryScreen() {
           </View>
         </View>
 
-        {playerHandicap !== null && (
+        {(myPlayingHandicap !== null || myTeeColor) && (
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Tu handicap</Text>
-            <Text style={styles.infoValue}>{playerHandicap}</Text>
+            {myPlayingHandicap !== null && (
+              <>
+                <Text style={styles.infoLabel}>Tu handicap de juego</Text>
+                <Text style={styles.infoValue}>{myPlayingHandicap}</Text>
+              </>
+            )}
+            {myTeeColor && myTeeColor !== 'not_applicable' && (
+              <View style={[styles.teeDot, { backgroundColor: TEE_COLOR_HEX[myTeeColor] ?? Colors.golf.border }]} />
+            )}
           </View>
         )}
 
@@ -229,6 +250,9 @@ export default function CodeEntryScreen() {
             const isMe = player.id === currentPlayerId;
             const iMark = myIndex >= 0 && idx === enrichedPlayers[myIndex]?.marksIndex;
             const marksMe = myIndex >= 0 && idx === enrichedPlayers[myIndex]?.markedByIndex;
+            const teeHex = player.tee_color && player.tee_color !== 'not_applicable'
+              ? (TEE_COLOR_HEX[player.tee_color] ?? null)
+              : null;
 
             return (
               <View
@@ -255,9 +279,12 @@ export default function CodeEntryScreen() {
                     <Text style={styles.playerMarksLabel}>Lo marcas tú</Text>
                   )}
                 </View>
-                {player.handicap !== undefined && (
+                {teeHex && (
+                  <View style={[styles.teeDot, { backgroundColor: teeHex }]} />
+                )}
+                {player.playing_handicap !== undefined && (
                   <View style={styles.hcpBadge}>
-                    <Text style={styles.hcpText}>{player.handicap}</Text>
+                    <Text style={styles.hcpText}>{player.playing_handicap}</Text>
                   </View>
                 )}
               </View>
@@ -566,6 +593,13 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
     color: Colors.golf.info,
     letterSpacing: 0.3,
+  },
+  teeDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.15)',
   },
   hcpBadge: {
     backgroundColor: Colors.golf.background,

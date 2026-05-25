@@ -139,8 +139,8 @@ export default function CompetitionSelectPlayerScreen() {
     if (!groupCode) {
       console.log('[CompetitionSelectPlayer] Missing competition code');
       setUnassignedPlayers(
-        players.map((p: { id: string; first_name: string; last_name: string; handicap?: number }) => ({
-          id: p.id, firstName: p.first_name, lastName: p.last_name, handicap: p.handicap,
+        players.map((p: { id: string; first_name: string; last_name: string; playing_handicap?: number }) => ({
+          id: p.id, firstName: p.first_name, lastName: p.last_name, handicap: p.playing_handicap,
         }))
       );
       setIsLoading(false);

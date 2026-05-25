@@ -25,7 +25,7 @@ export default function ConfirmationScreen() {
       scoringMode: competition.effective_scoring_entry_mode === 'partial' ? 'partial' : 'all',
       players: competition.players.map((p) => ({
         id: p.id, firstName: p.first_name, lastName: p.last_name,
-        license: p.license, handicap: p.handicap,
+        license: p.license, handicap: p.playing_handicap,
       })),
     };
     startCompetition(comp);
@@ -82,9 +82,9 @@ export default function ConfirmationScreen() {
                 <Text style={styles.playerName}>
                   {player.first_name} {player.last_name}
                 </Text>
-                {player.handicap !== undefined && (
+                {player.playing_handicap !== undefined && (
                   <View style={styles.handicapBadge}>
-                    <Text style={styles.handicapText}>HCP {player.handicap}</Text>
+                    <Text style={styles.handicapText}>HCP {player.playing_handicap}</Text>
                   </View>
                 )}
               </View>

@@ -7,7 +7,7 @@ export interface FirebaseCompetitionData {
   group_code: string;
   competition_name: string;
   event_name: string;
-  players: { id: string; first_name: string; last_name: string; license: string; handicap?: number }[];
+  players: { id: string; first_name: string; last_name: string; license: string; playing_handicap?: number; tee_color?: string }[];
   course_name?: string;
   route_name?: string;
   session_uuid?: string;

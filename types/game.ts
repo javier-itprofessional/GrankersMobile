@@ -51,7 +51,8 @@ export interface FirebaseCompetitionData {
     first_name: string;
     last_name: string;
     license: string;
-    handicap?: number;
+    playing_handicap?: number;
+    tee_color?: string;
   }[];
   course_name?: string;
   route_name?: string;
