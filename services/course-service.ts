@@ -115,7 +115,7 @@ function transformCourse(wire: WireCourseData): CourseData {
       teeColor: r.tee_color,
       gender: r.gender,
       totalDistance: r.total_distance,
-      holes: (r.holes ?? []).map((h) => ({
+      holes: (Array.isArray(r.holes) ? r.holes : []).map((h) => ({
         hole_number: h.number,
         par: h.par,
         handicap: h.handicap,
