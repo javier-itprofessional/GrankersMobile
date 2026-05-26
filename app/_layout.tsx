@@ -65,6 +65,7 @@ function RootLayoutNav() {
       <Stack.Screen name="free-play/select-players" options={{ headerShown: true }} />
       <Stack.Screen name="free-play/setup" options={{ headerShown: true }} />
       <Stack.Screen name="free-play/search-license" options={{ headerShown: true }} />
+      <Stack.Screen name="free-play/waiting-players" options={{ headerShown: true }} />
       <Stack.Screen name="player-area/index" options={{ headerShown: true }} />
       <Stack.Screen name="player-area/login" options={{ headerShown: false }} />
       <Stack.Screen name="player-area/register" options={{ headerShown: false }} />

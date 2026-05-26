@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Alert } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { ClipboardCheck, Eye, PenLine, ChevronLeft, Check, Clock, Minus, Plus } from 'lucide-react-native';
+import { ClipboardCheck, Eye, PenLine, ChevronLeft, Check, Clock, Minus, Plus, AlertCircle } from 'lucide-react-native';
 import Colors from '../../constants/colors';
 import { FontFamily } from '../../constants/Typography';
 import { useCompetition } from '../../providers/CompetitionProvider';
@@ -12,15 +12,15 @@ export default function ComprobacionScreen() {
     competition,
     currentDevicePlayerId,
     playerScoresMap,
-    holePars,
     resetCompetition,
     updateCurrentScreen,
-    goToHole,
+    amendScore,
   } = useCompetition();
 
   const [reviewModalVisible, setReviewModalVisible] = useState<boolean>(false);
   const [editingHole, setEditingHole] = useState<number | null>(null);
   const [editingScore, setEditingScore] = useState<number>(0);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   useEffect(() => {
     updateCurrentScreen('/competition/comprobacion');
@@ -42,40 +42,56 @@ export default function ComprobacionScreen() {
     const players = competition.players;
     const myIndex = players.findIndex(p => p.id === currentDevicePlayerId);
     if (myIndex === -1) return null;
-    const prevIndex = (myIndex - 1 + players.length) % players.length;
-    return players[prevIndex];
+    return players[(myIndex - 1 + players.length) % players.length];
   }, [competition, currentDevicePlayerId]);
 
-  const myOwnScores = useMemo(() => {
-    if (!currentDevicePlayerId) return null;
-    const scores = playerScoresMap.get(currentDevicePlayerId);
-    if (!scores) return null;
-    const totalStrokes = scores.scores.reduce((sum, s) => sum + s.score, 0);
-    const totalPar = scores.scores.reduce((sum, s) => sum + s.par, 0);
-    return { totalStrokes, totalPar, diff: totalStrokes - totalPar };
+  // All 18 hole records for the current player
+  const myHoleScores = useMemo(() => {
+    if (!currentDevicePlayerId) return [];
+    return playerScoresMap.get(currentDevicePlayerId)?.scores ?? [];
   }, [currentDevicePlayerId, playerScoresMap]);
 
-  // Marker scores are delivered via WebSocket (score_confirmed events) and reflected in playerScoresMap
+  const myOwnScores = useMemo(() => {
+    const saved = myHoleScores.filter((s) => s.saved);
+    if (!saved.length) return null;
+    const totalStrokes = saved.reduce((sum, s) => sum + s.score, 0);
+    const totalPar = saved.reduce((sum, s) => sum + s.par, 0);
+    return { totalStrokes, totalPar, diff: totalStrokes - totalPar };
+  }, [myHoleScores]);
+
+  // Marker scores come from conflictScoreMarker on my hole records (filled via score_confirmed WS)
   const markerScoresForMe = useMemo(() => {
-    if (!currentDevicePlayerId || !markerPlayer) return null;
-
-    const markerScores = playerScoresMap.get(markerPlayer.id);
-    if (!markerScores) return null;
-
-    const savedScores = markerScores.scores.filter((s) => s.saved);
-    const totalStrokes = savedScores.reduce((sum, s) => sum + s.score, 0);
-    const totalPar = savedScores.reduce((sum, s) => sum + s.par, 0);
-    const holeScores = savedScores.map((s) => ({ hole: s.holeNumber, score: s.score, par: s.par }));
-
+    const holesWithMarker = myHoleScores.filter(
+      (s) => s.conflictScoreMarker !== null && s.conflictScoreMarker !== undefined
+    );
+    if (!holesWithMarker.length) return null;
+    const totalStrokes = holesWithMarker.reduce((sum, s) => sum + (s.conflictScoreMarker ?? 0), 0);
+    const totalPar = holesWithMarker.reduce((sum, s) => sum + s.par, 0);
     return {
       totalStrokes,
       totalPar,
       diff: totalStrokes - totalPar,
-      holesCompleted: savedScores.length,
-      allHolesCompleted: savedScores.length === 18,
-      holeScores,
+      holesCompleted: holesWithMarker.length,
+      allHolesCompleted: holesWithMarker.length === 18,
     };
-  }, [currentDevicePlayerId, markerPlayer, playerScoresMap]);
+  }, [myHoleScores]);
+
+  // Holes where self-recorded score ≠ marker-recorded score (both present)
+  const conflictHoles = useMemo(() => {
+    const set = new Set<number>();
+    for (const s of myHoleScores) {
+      if (
+        s.conflictScoreLocal !== null && s.conflictScoreLocal !== undefined &&
+        s.conflictScoreMarker !== null && s.conflictScoreMarker !== undefined &&
+        s.conflictScoreLocal !== s.conflictScoreMarker
+      ) {
+        set.add(s.holeNumber);
+      }
+    }
+    return set;
+  }, [myHoleScores]);
+
+  const hasConflicts = conflictHoles.size > 0;
 
   const formatDiff = useCallback((diff: number) => {
     if (diff > 0) return `+${diff}`;
@@ -88,6 +104,14 @@ export default function ComprobacionScreen() {
   }, []);
 
   const handleSignCard = useCallback(() => {
+    if (hasConflicts) {
+      Alert.alert(
+        'Conflictos pendientes',
+        `${conflictHoles.size} hoyo(s) con discrepancia (${Array.from(conflictHoles).sort((a, b) => a - b).join(', ')}). Resuélvelos antes de firmar.`,
+        [{ text: 'Revisar', onPress: () => setReviewModalVisible(true) }]
+      );
+      return;
+    }
     Alert.alert(
       'Firmar tarjeta',
       '¿Estás seguro de que quieres firmar la tarjeta? Esta acción no se puede deshacer.',
@@ -96,32 +120,31 @@ export default function ComprobacionScreen() {
         {
           text: 'Firmar',
           onPress: () => {
-            console.log('[Comprobacion] Card signed');
             resetCompetition();
             router.replace('/');
           },
         },
       ]
     );
-  }, [resetCompetition, router]);
+  }, [hasConflicts, conflictHoles, resetCompetition, router]);
 
-  const _handleEditHole = useCallback((hole: number, currentScore: number) => {
-    setEditingHole(hole);
-    setEditingScore(currentScore);
-  }, []);
+  const handleEditHole = useCallback((holeNumber: number) => {
+    const hs = myHoleScores.find((s) => s.holeNumber === holeNumber);
+    // Default to marker score so player is agreeing to (or amending) what was recorded
+    setEditingScore(hs?.conflictScoreMarker ?? hs?.score ?? 0);
+    setEditingHole(holeNumber);
+  }, [myHoleScores]);
 
-  const handleSaveEdit = useCallback(() => {
-    if (editingHole !== null) {
-      console.log('[Comprobacion] Saving edit for hole', editingHole, 'score:', editingScore);
+  const handleSaveEdit = useCallback(async () => {
+    if (editingHole === null || !currentDevicePlayerId) return;
+    setIsSavingEdit(true);
+    try {
+      await amendScore(currentDevicePlayerId, editingHole, editingScore);
       setEditingHole(null);
+    } finally {
+      setIsSavingEdit(false);
     }
-  }, [editingHole, editingScore]);
-
-  const handleGoToHole = useCallback((holeNumber: number) => {
-    setReviewModalVisible(false);
-    goToHole(holeNumber);
-    router.push('/competition/scoring');
-  }, [goToHole, router]);
+  }, [editingHole, editingScore, currentDevicePlayerId, amendScore]);
 
   if (!competition || !myPlayer) {
     return null;
@@ -137,6 +160,15 @@ export default function ComprobacionScreen() {
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+        {hasConflicts && (
+          <View style={styles.conflictBanner}>
+            <AlertCircle size={18} color="#C0392B" />
+            <Text style={styles.conflictBannerText}>
+              {conflictHoles.size} hoyo(s) con discrepancia: {Array.from(conflictHoles).sort((a, b) => a - b).join(', ')}
+            </Text>
+          </View>
+        )}
+
         <View style={styles.block}>
           <View style={styles.blockHeader}>
             <ClipboardCheck size={18} color={Colors.golf.primary} />
@@ -148,7 +180,7 @@ export default function ComprobacionScreen() {
               {markerPlayer ? `${markerPlayer.firstName} ${markerPlayer.lastName}` : 'Marcador desconocido'}
             </Text>
 
-            {markerScoresForMe && markerScoresForMe.allHolesCompleted ? (
+            {markerScoresForMe?.allHolesCompleted ? (
               <View style={styles.scoresContainer}>
                 <View style={styles.statRow}>
                   <Text style={styles.statLabel}>Total de golpes</Text>
@@ -170,7 +202,11 @@ export default function ComprobacionScreen() {
             ) : (
               <View style={styles.waitingContainer}>
                 <Clock size={22} color={Colors.golf.accent} />
-                <Text style={styles.waitingText}>Esperando tarjeta del marcador...</Text>
+                <Text style={styles.waitingText}>
+                  {markerScoresForMe
+                    ? `${markerScoresForMe.holesCompleted}/18 hoyos recibidos...`
+                    : 'Esperando tarjeta del marcador...'}
+                </Text>
               </View>
             )}
           </View>
@@ -223,7 +259,7 @@ export default function ComprobacionScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.signButton}
+            style={[styles.signButton, hasConflicts && styles.signButtonDisabled]}
             onPress={handleSignCard}
             testID="sign-card-button"
           >
@@ -244,29 +280,27 @@ export default function ComprobacionScreen() {
             <TouchableOpacity onPress={() => setReviewModalVisible(false)} testID="close-review-modal">
               <ChevronLeft size={28} color={Colors.golf.primary} />
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Tarjeta del marcador</Text>
+            <Text style={styles.modalTitle}>Revisión de tarjeta</Text>
             <View style={{ width: 28 }} />
           </View>
 
-          {!markerScoresForMe || !markerScoresForMe.allHolesCompleted ? (
-            <View style={styles.modalWaiting}>
-              <Clock size={32} color={Colors.golf.accent} />
-              <Text style={styles.modalWaitingText}>El marcador aún no ha completado todos los hoyos</Text>
+          <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalContent}>
+            <View style={styles.scorecardHeader}>
+              <Text style={styles.scorecardHeaderHole}>Hoyo</Text>
+              <Text style={styles.scorecardHeaderPar}>Par</Text>
+              <Text style={styles.scorecardHeaderMarker}>Marc.</Text>
+              <Text style={styles.scorecardHeaderMe}>Yo</Text>
+              <View style={{ width: 40 }} />
             </View>
-          ) : (
-            <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalContent}>
-              <View style={styles.scorecardHeader}>
-                <Text style={styles.scorecardHeaderHole}>Hoyo</Text>
-                <Text style={styles.scorecardHeaderPar}>Par</Text>
-                <Text style={styles.scorecardHeaderScore}>Golpes</Text>
-                <Text style={styles.scorecardHeaderAction}>Editar</Text>
-              </View>
 
-              {markerScoresForMe.holeScores.map((hs) => (
-                <View key={hs.hole} style={styles.scorecardRow}>
-                  {editingHole === hs.hole ? (
+            {myHoleScores.map((hs) => {
+              const isConflict = conflictHoles.has(hs.holeNumber);
+
+              return (
+                <View key={hs.holeNumber} style={[styles.scorecardRow, isConflict && styles.scorecardRowConflict]}>
+                  {editingHole === hs.holeNumber ? (
                     <>
-                      <Text style={styles.scorecardHole}>{hs.hole}</Text>
+                      <Text style={styles.scorecardHole}>{hs.holeNumber}</Text>
                       <Text style={styles.scorecardPar}>{hs.par}</Text>
                       <View style={styles.editScoreContainer}>
                         <TouchableOpacity
@@ -283,41 +317,57 @@ export default function ComprobacionScreen() {
                           <Plus size={14} color={Colors.golf.primary} />
                         </TouchableOpacity>
                       </View>
-                      <TouchableOpacity style={styles.saveEditBtn} onPress={handleSaveEdit}>
+                      <TouchableOpacity
+                        style={[styles.saveEditBtn, isSavingEdit && styles.saveEditBtnDisabled]}
+                        onPress={handleSaveEdit}
+                        disabled={isSavingEdit}
+                      >
                         <Check size={14} color="#FFFFFF" />
                       </TouchableOpacity>
                     </>
                   ) : (
                     <>
-                      <Text style={styles.scorecardHole}>{hs.hole}</Text>
+                      <Text style={[styles.scorecardHole, isConflict && styles.conflictText]}>{hs.holeNumber}</Text>
                       <Text style={styles.scorecardPar}>{hs.par}</Text>
                       <Text style={[
                         styles.scorecardScore,
-                        hs.score > hs.par && styles.scoreOver,
-                        hs.score < hs.par && styles.scoreUnder,
+                        isConflict && styles.conflictScoreText,
+                        !isConflict && hs.conflictScoreMarker !== null && (hs.conflictScoreMarker ?? 0) > hs.par && styles.scoreOver,
+                        !isConflict && hs.conflictScoreMarker !== null && (hs.conflictScoreMarker ?? 0) < hs.par && styles.scoreUnder,
                       ]}>
-                        {hs.score}
+                        {hs.conflictScoreMarker ?? '—'}
+                      </Text>
+                      <Text style={[
+                        styles.scorecardScore,
+                        isConflict && styles.conflictScoreText,
+                        !isConflict && hs.conflictScoreLocal !== null && (hs.conflictScoreLocal ?? 0) > hs.par && styles.scoreOver,
+                        !isConflict && hs.conflictScoreLocal !== null && (hs.conflictScoreLocal ?? 0) < hs.par && styles.scoreUnder,
+                      ]}>
+                        {hs.conflictScoreLocal ?? '—'}
                       </Text>
                       <TouchableOpacity
-                        style={styles.editHoleBtn}
-                        onPress={() => handleGoToHole(hs.hole)}
-                        testID={`edit-hole-${hs.hole}`}
+                        style={[styles.editHoleBtn, isConflict && styles.editHoleBtnConflict]}
+                        onPress={() => handleEditHole(hs.holeNumber)}
+                        testID={`edit-hole-${hs.holeNumber}`}
                       >
-                        <PenLine size={14} color={Colors.golf.primary} />
+                        <PenLine size={14} color={isConflict ? '#C0392B' : Colors.golf.primary} />
                       </TouchableOpacity>
                     </>
                   )}
                 </View>
-              ))}
+              );
+            })}
 
+            {myHoleScores.length > 0 && (
               <View style={styles.scorecardTotal}>
                 <Text style={styles.totalLabel}>Total</Text>
-                <Text style={styles.totalPar}>{markerScoresForMe.totalPar}</Text>
-                <Text style={styles.totalScore}>{markerScoresForMe.totalStrokes}</Text>
+                <Text style={styles.totalPar}>{myHoleScores.reduce((s, h) => s + h.par, 0)}</Text>
+                <Text style={styles.totalScore}>{markerScoresForMe?.totalStrokes ?? '—'}</Text>
+                <Text style={styles.totalScore}>{myOwnScores?.totalStrokes ?? '—'}</Text>
                 <View style={{ width: 40 }} />
               </View>
-            </ScrollView>
-          )}
+            )}
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -356,6 +406,23 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 16,
     paddingBottom: 40,
+  },
+  conflictBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FDEDEC',
+    borderWidth: 1,
+    borderColor: '#E74C3C',
+    borderRadius: 12,
+    padding: 14,
+  },
+  conflictBannerText: {
+    fontFamily: FontFamily.bodyMedium,
+    fontSize: 13,
+    fontWeight: '500' as const,
+    color: '#C0392B',
+    flex: 1,
   },
   block: {
     backgroundColor: '#FFFFFF',
@@ -486,6 +553,11 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
+  signButtonDisabled: {
+    backgroundColor: Colors.golf.textLight,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
   signButtonText: {
     fontFamily: FontFamily.bodyBold,
     fontSize: 16,
@@ -513,20 +585,6 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
     color: Colors.golf.text,
   },
-  modalWaiting: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-    padding: 40,
-  },
-  modalWaitingText: {
-    fontFamily: FontFamily.bodyMedium,
-    fontSize: 15,
-    fontWeight: '500' as const,
-    color: Colors.golf.textLight,
-    textAlign: 'center',
-  },
   modalScroll: {
     flex: 1,
   },
@@ -536,7 +594,7 @@ const styles = StyleSheet.create({
   scorecardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 16,
     backgroundColor: Colors.golf.headerBg,
     borderTopLeftRadius: 12,
@@ -545,30 +603,30 @@ const styles = StyleSheet.create({
   scorecardHeaderHole: {
     fontFamily: FontFamily.bodyBold,
     flex: 1,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700' as const,
     color: '#FFFFFF',
   },
   scorecardHeaderPar: {
     fontFamily: FontFamily.bodyBold,
-    width: 50,
-    fontSize: 12,
+    width: 36,
+    fontSize: 11,
     fontWeight: '700' as const,
     color: '#FFFFFF',
     textAlign: 'center',
   },
-  scorecardHeaderScore: {
+  scorecardHeaderMarker: {
     fontFamily: FontFamily.bodyBold,
-    width: 60,
-    fontSize: 12,
+    width: 52,
+    fontSize: 11,
     fontWeight: '700' as const,
     color: '#FFFFFF',
     textAlign: 'center',
   },
-  scorecardHeaderAction: {
+  scorecardHeaderMe: {
     fontFamily: FontFamily.bodyBold,
-    width: 50,
-    fontSize: 12,
+    width: 52,
+    fontSize: 11,
     fontWeight: '700' as const,
     color: '#FFFFFF',
     textAlign: 'center',
@@ -576,11 +634,14 @@ const styles = StyleSheet.create({
   scorecardRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 11,
     paddingHorizontal: 16,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: Colors.golf.border,
+  },
+  scorecardRowConflict: {
+    backgroundColor: '#FDEDEC',
   },
   scorecardHole: {
     fontFamily: FontFamily.bodySemi,
@@ -591,19 +652,25 @@ const styles = StyleSheet.create({
   },
   scorecardPar: {
     fontFamily: FontFamily.bodyMedium,
-    width: 50,
-    fontSize: 14,
+    width: 36,
+    fontSize: 13,
     fontWeight: '500' as const,
     color: Colors.golf.textLight,
     textAlign: 'center',
   },
   scorecardScore: {
     fontFamily: FontFamily.headingSemi,
-    width: 60,
-    fontSize: 17,
+    width: 52,
+    fontSize: 16,
     fontWeight: '700' as const,
     color: Colors.golf.text,
     textAlign: 'center',
+  },
+  conflictText: {
+    color: '#C0392B',
+  },
+  conflictScoreText: {
+    color: '#C0392B',
   },
   scoreOver: {
     color: Colors.golf.error,
@@ -618,13 +685,16 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.golf.primary + '12',
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 7,
+    marginLeft: 4,
+  },
+  editHoleBtnConflict: {
+    backgroundColor: '#FADBD8',
   },
   editScoreContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    width: 60,
+    gap: 4,
+    width: 108,
     justifyContent: 'center',
   },
   editControlBtn: {
@@ -652,12 +722,15 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.golf.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 7,
+    marginLeft: 4,
+  },
+  saveEditBtnDisabled: {
+    opacity: 0.5,
   },
   scorecardTotal: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 13,
     paddingHorizontal: 16,
     backgroundColor: Colors.golf.primary + '0D',
     borderBottomLeftRadius: 12,
@@ -666,22 +739,22 @@ const styles = StyleSheet.create({
   totalLabel: {
     fontFamily: FontFamily.bodyBold,
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700' as const,
     color: Colors.golf.text,
   },
   totalPar: {
     fontFamily: FontFamily.bodySemi,
-    width: 50,
-    fontSize: 14,
+    width: 36,
+    fontSize: 13,
     fontWeight: '600' as const,
     color: Colors.golf.textLight,
     textAlign: 'center',
   },
   totalScore: {
     fontFamily: FontFamily.headingSemi,
-    width: 60,
-    fontSize: 17,
+    width: 52,
+    fontSize: 16,
     fontWeight: '700' as const,
     color: Colors.golf.primary,
     textAlign: 'center',

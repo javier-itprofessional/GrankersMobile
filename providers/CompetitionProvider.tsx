@@ -125,6 +125,8 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
             .sort((a, b) => a.holeNumber - b.holeNumber);
           const scores: HoleScore[] = playerHoles.map((h) => ({
             holeNumber: h.holeNumber, par: h.par, score: h.score, saved: h.saved,
+            conflictScoreLocal: h.conflictScoreLocal ?? null,
+            conflictScoreMarker: h.conflictScoreMarker ?? null,
           }));
           const saved = scores.filter((s) => s.saved);
           scoresMap.set(player.id, {
@@ -222,10 +224,12 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
 
       if (payload.status === 'withdrawn') {
         setIsSessionTerminated(true);
-        Alert.alert('Retirado', 'Has sido retirado por el organizador.');
+        syncEngine.stop();
+        Alert.alert('Withdrawn', 'You have been withdrawn by the organizer.');
       } else if (payload.status === 'not_started' && (prev === 'ready' || prev === 'playing')) {
         setIsSessionTerminated(true);
-        Alert.alert('Dispositivo desvinculado', 'Tu dispositivo fue desvinculado. Vuelve a escanear el código de grupo.');
+        syncEngine.stop();
+        Alert.alert('Device unlinked', 'Your device was unlinked. Re-scan the group code to continue.');
       }
     });
 
@@ -238,6 +242,60 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
       unsubFinished();
     };
   }, [currentDevicePlayerId]);
+
+  // ─── WebSocket: score cross-reference (§scoring-cross-ref) ──────────────────
+
+  useEffect(() => {
+    if (!activeRoundId) return;
+
+    const unsub = wsClient.on('score_confirmed', async (payload) => {
+      if (!payload.round_id || payload.round_id !== activeRoundId) return;
+      if (!payload.hole_number || !payload.scores || !payload.scored_by) return;
+
+      const { hole_number, scores, scored_by } = payload;
+
+      await database.write(async () => {
+        const dbScores = await database
+          .get<HoleScoreModel>('hole_scores')
+          .query(Q.and(Q.where('round_id', activeRoundId), Q.where('hole_number', hole_number)))
+          .fetch();
+
+        for (const entry of scores) {
+          const dbScore = dbScores.find((d) => d.playerExternalId === entry.player_id);
+          if (!dbScore) continue;
+          if (scored_by === entry.player_id) {
+            await dbScore.update((r) => { r.conflictScoreLocal = entry.score; });
+          } else {
+            await dbScore.update((r) => { r.conflictScoreMarker = entry.score; });
+          }
+        }
+      });
+
+      setPlayerScoresMap((prev) => {
+        const next = new Map(prev);
+        for (const entry of scores) {
+          const ps = next.get(entry.player_id);
+          if (!ps) continue;
+          next.set(entry.player_id, {
+            ...ps,
+            scores: ps.scores.map((s) =>
+              s.holeNumber === hole_number
+                ? {
+                    ...s,
+                    ...(scored_by === entry.player_id
+                      ? { conflictScoreLocal: entry.score }
+                      : { conflictScoreMarker: entry.score }),
+                  }
+                : s
+            ),
+          });
+        }
+        return next;
+      });
+    });
+
+    return unsub;
+  }, [activeRoundId]);
 
   // ─── Persist currentHole and currentScreen ──────────────────────────────────
 
@@ -323,6 +381,7 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
         playerId: player.id,
         scores: Array.from({ length: 18 }, (_, i) => ({
           holeNumber: i + 1, par: pars[i], score: pars[i], saved: false,
+          conflictScoreLocal: null, conflictScoreMarker: null,
         })),
         totalScore: 0, totalPar: 72,
       });
@@ -380,6 +439,9 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
             r.score = inMemory.score;
             r.saved = true;
             r.savedAt = Date.now();
+            if (dbScore.playerExternalId === currentDevicePlayerId) {
+              r.conflictScoreLocal = inMemory.score;
+            }
           });
         }
       }
@@ -388,7 +450,11 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
     setPlayerScoresMap((prev) => {
       const next = new Map(prev);
       next.forEach((ps, id) => {
-        const updated = ps.scores.map((s) => s.holeNumber === holeNumber ? { ...s, saved: true } : s);
+        const updated = ps.scores.map((s) =>
+          s.holeNumber === holeNumber
+            ? { ...s, saved: true, ...(id === currentDevicePlayerId ? { conflictScoreLocal: s.score } : {}) }
+            : s
+        );
         const saved = updated.filter((s) => s.saved);
         next.set(id, { ...ps, scores: updated, totalScore: saved.reduce((n, s) => n + s.score, 0), totalPar: saved.reduce((n, s) => n + s.par, 0) });
       });
@@ -399,14 +465,14 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
     const scores = visiblePlayers
       .map((player) => {
         const holeScore = playerScoresMap.get(player.id)?.scores.find((s) => s.holeNumber === holeNumber);
-        return holeScore ? { player_id: player.id, score: holeScore.score } : null;
+        return holeScore ? { player_id: player.id, score: holeScore.score, scored_by: currentDevicePlayerId ?? '' } : null;
       })
-      .filter((s): s is { player_id: string; score: number } => s !== null);
+      .filter((s): s is { player_id: string; score: number; scored_by: string } => s !== null);
 
     if (scores.length > 0) {
       await syncEngine.record('HOLE_SAVED', { round_id: activeRoundId, hole_number: holeNumber, scores }, activeRoundId);
     }
-  }, [competition, activeRoundId, playerScoresMap, scoringMode, visiblePlayerIds, isSessionTerminated]);
+  }, [competition, activeRoundId, playerScoresMap, scoringMode, visiblePlayerIds, isSessionTerminated, currentDevicePlayerId]);
 
   const goToNextHole = useCallback(() => setCurrentHole((h) => Math.min(h + 1, 18)), []);
   const goToPreviousHole = useCallback(() => setCurrentHole((h) => Math.max(h - 1, 1)), []);
@@ -479,6 +545,56 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
 
   const updateCurrentScreen = useCallback((screenName: string) => setCurrentScreen(screenName), []);
 
+  const amendScore = useCallback(async (
+    playerId: string,
+    holeNumber: number,
+    agreedScore: number,
+    reason?: string,
+  ): Promise<void> => {
+    if (!activeRoundId) return;
+
+    const oldScore = playerScoresMap.get(playerId)?.scores.find((s) => s.holeNumber === holeNumber)?.score ?? agreedScore;
+
+    await database.write(async () => {
+      const dbScores = await database
+        .get<HoleScoreModel>('hole_scores')
+        .query(Q.and(Q.where('round_id', activeRoundId), Q.where('hole_number', holeNumber)))
+        .fetch();
+      const dbScore = dbScores.find((d) => d.playerExternalId === playerId);
+      if (dbScore) {
+        await dbScore.update((r) => {
+          r.score = agreedScore;
+          r.conflictScoreLocal = agreedScore;
+          r.conflictScoreMarker = agreedScore;
+        });
+      }
+    });
+
+    setPlayerScoresMap((prev) => {
+      const next = new Map(prev);
+      const ps = next.get(playerId);
+      if (ps) {
+        const updated = ps.scores.map((s) =>
+          s.holeNumber === holeNumber
+            ? { ...s, score: agreedScore, conflictScoreLocal: agreedScore, conflictScoreMarker: agreedScore }
+            : s
+        );
+        const saved = updated.filter((s) => s.saved);
+        next.set(playerId, { ...ps, scores: updated, totalScore: saved.reduce((n, s) => n + s.score, 0), totalPar: saved.reduce((n, s) => n + s.par, 0) });
+      }
+      return next;
+    });
+
+    await syncEngine.record('SCORE_AMENDED', {
+      round_id: activeRoundId,
+      player_id: playerId,
+      hole_number: holeNumber,
+      old_score: oldScore,
+      new_score: agreedScore,
+      reason,
+    }, activeRoundId);
+  }, [activeRoundId, playerScoresMap]);
+
   // ─── Leaderboard (WebSocket > local) ────────────────────────────────────────
 
   const leaderboard = useMemo(() => {
@@ -523,7 +639,7 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
     competition, currentHole, holePars, holeHandicaps, playerScoresMap,
     isOnline, isLoaded, currentDevicePlayerId, deviceId, currentScreen,
     scoringMode, visiblePlayerIds, isSessionActive: !isSessionTerminated,
-    startCompetition, updateScore, saveHole,
+    startCompetition, updateScore, saveHole, amendScore,
     goToNextHole, goToPreviousHole, goToHole,
     isHoleSaved, allHolesSaved, leaderboard,
     resetCompetition, finishCompetition,
@@ -533,7 +649,7 @@ export const [CompetitionProvider, useCompetition] = createContextHook(() => {
     competition, currentHole, holePars, holeHandicaps, playerScoresMap,
     isOnline, isLoaded, currentDevicePlayerId, deviceId, currentScreen,
     scoringMode, visiblePlayerIds, isSessionTerminated,
-    startCompetition, updateScore, saveHole,
+    startCompetition, updateScore, saveHole, amendScore,
     goToNextHole, goToPreviousHole, goToHole,
     isHoleSaved, allHolesSaved, leaderboard,
     resetCompetition, finishCompetition,

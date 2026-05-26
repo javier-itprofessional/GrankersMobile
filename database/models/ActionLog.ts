@@ -28,7 +28,7 @@ export type ActionType =
 export interface HoleSavedPayload {
   round_id: string;
   hole_number: number;
-  scores: { player_id: string; score: number; strokes_net?: number }[];
+  scores: { player_id: string; score: number; scored_by: string; strokes_net?: number }[];
 }
 
 export interface ScoreAmendedPayload {

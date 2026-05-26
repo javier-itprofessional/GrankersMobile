@@ -29,7 +29,15 @@ export type WsEventType =
 
 export type WsEventPayload = {
   leaderboard_updated: { round_id: string; leaderboard: LeaderboardEntry[] };
-  score_confirmed: { action_id: string; materialized: boolean };
+  score_confirmed: {
+    action_id: string;
+    materialized: boolean;
+    // Enriched fields sent once backend implements §scoring-cross-ref:
+    round_id?: string;
+    hole_number?: number;
+    scored_by?: string;
+    scores?: { player_id: string; score: number }[];
+  };
   player_status_changed: PlayerStatusEvent;
   round_finished: { round_id: string; closed_at: string };
   max_retries_reached: Record<string, never>;

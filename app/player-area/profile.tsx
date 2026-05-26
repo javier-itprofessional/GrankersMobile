@@ -11,7 +11,7 @@ import { FontFamily, FontSize } from '@/constants/Typography';
 import { usePlayerAuth } from '@/providers/PlayerAuthProvider';
 import {
   updateProfile, createLicense, updateLicense, deleteLicense,
-  getGolfFederations, UserLicense, GolfFederation,
+  getGolfFederations, lookupFederationHandicap, UserLicense, GolfFederation,
 } from '@/services/user-service';
 
 type Tab = 'personal' | 'golf';
@@ -87,6 +87,20 @@ function LicenseForm({ federations, onSave, onCancel, initial }: LicenseFormProp
   );
   const [handicap, setHandicap] = useState(initial?.handicap != null ? String(initial.handicap) : '');
   const [fedPickerVisible, setFedPickerVisible] = useState(false);
+  const [fetchingHandicap, setFetchingHandicap] = useState(false);
+
+  // Auto-fetch handicap from federation API after 800 ms of inactivity
+  useEffect(() => {
+    const trimmed = licenseNumber.trim();
+    if (trimmed.length < 3 || !selectedFed) return;
+    const timer = setTimeout(async () => {
+      setFetchingHandicap(true);
+      const value = await lookupFederationHandicap(trimmed, selectedFed.code);
+      if (value != null) setHandicap(String(value));
+      setFetchingHandicap(false);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [licenseNumber, selectedFed]);
 
   const fedOptions = federations.map((f) => ({ value: f.uuid, label: `${f.name} (${f.code})` }));
 
@@ -114,14 +128,18 @@ function LicenseForm({ federations, onSave, onCancel, initial }: LicenseFormProp
         autoCapitalize="characters"
       />
 
-      <Text style={styles.fieldLabel}>Hándicap (opcional)</Text>
+      <View style={licenseFormStyles.handicapLabelRow}>
+        <Text style={styles.fieldLabel}>Hándicap</Text>
+        {fetchingHandicap && <ActivityIndicator size="small" color={Colors.golf.primary} />}
+      </View>
       <TextInput
         style={styles.input}
         value={handicap}
         onChangeText={setHandicap}
-        placeholder="Ej. 18.4"
+        placeholder={fetchingHandicap ? 'Buscando…' : 'Ej. 18.4'}
         placeholderTextColor={Colors.golf.textMuted}
         keyboardType="decimal-pad"
+        editable={!fetchingHandicap}
       />
 
       <View style={licenseFormStyles.actions}>
@@ -135,7 +153,7 @@ function LicenseForm({ federations, onSave, onCancel, initial }: LicenseFormProp
             onSave({
               license_number: licenseNumber.trim(),
               golf_federation_uuid: selectedFed.uuid,
-              handicap: handicap ? parseFloat(handicap) : null,
+              handicap: handicap ? parseFloat(handicap) : 0,
             });
           }}
         >
@@ -230,8 +248,9 @@ export default function ProfileScreen() {
       const lic = await createLicense(data);
       await updateCachedLicenses([...userLicenses, lic]);
       setShowLicenseForm(false);
-    } catch {
-      Alert.alert('Error', 'No se pudo crear la licencia.');
+    } catch (err) {
+      const msg = (err as Error)?.message;
+      Alert.alert('Error', msg && !msg.startsWith('HTTP') ? msg : 'No se pudo crear la licencia. Verifica los datos e inténtalo de nuevo.');
     }
   };
 
@@ -587,6 +606,9 @@ const licenseFormStyles = StyleSheet.create({
   header: { marginBottom: 16 },
   title: {
     fontSize: FontSize.bodyM, fontFamily: FontFamily.headingSemi, color: Colors.golf.text,
+  },
+  handicapLabelRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6,
   },
   actions: { flexDirection: 'row', marginTop: 4 },
 });

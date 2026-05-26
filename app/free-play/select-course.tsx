@@ -132,9 +132,10 @@ export default function SelectCourseScreen() {
     checkActiveGames();
   };
 
-  const filteredCourses = courses.filter((c) =>
-    c.name.toLowerCase().includes(courseSearchText.toLowerCase())
-  );
+  const filteredCourses = (courseSearchText.length > 0
+    ? courses.filter((c) => c.name.toLowerCase().includes(courseSearchText.toLowerCase()))
+    : courses
+  ).slice(0, 50);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -189,7 +190,7 @@ export default function SelectCourseScreen() {
                     <Text style={styles.loadingText}>Cargando campos...</Text>
                   </View>
                 ) : (
-                  <ScrollView style={styles.dropdownScroll} nestedScrollEnabled>
+                  <ScrollView style={styles.dropdownScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
                     {filteredCourses.length > 0 ? (
                       filteredCourses.map((course) => (
                         <TouchableOpacity

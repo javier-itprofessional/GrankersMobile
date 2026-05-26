@@ -28,6 +28,7 @@ export default function CompetitionScoringScreen() {
     scoringMode,
     visiblePlayerIds,
     leaderboard,
+    isSessionActive,
   } = useCompetition();
   const [editMode, setEditMode] = useState<boolean>(false);
 
@@ -77,7 +78,7 @@ export default function CompetitionScoringScreen() {
   const holeSaved = isHoleSaved(currentHole);
   const currentPar = holePars[currentHole - 1];
   const currentHcp = holeHandicaps[currentHole - 1] ?? 0;
-  const canEdit = editMode || !holeSaved;
+  const canEdit = isSessionActive && (editMode || !holeSaved);
 
   const handleSave = async () => {
     console.log('[Competition] Saving hole:', currentHole);

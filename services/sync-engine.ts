@@ -8,7 +8,6 @@ import { subscribeToConnectionChanges, getAppConfig, setAppConfig } from '@/lib/
 const MAX_RETRIES = 5;
 const BATCH_SIZE = 50;
 const FLUSH_INTERVAL_MS = 30_000;   // flush periódico cada 30s
-
 // ─── Tipos del protocolo ──────────────────────────────────────────────────────
 
 interface SyncAction {
@@ -29,7 +28,6 @@ interface SyncResponse {
 
 // Backoff por número de reintentos: immediate, 5s, 30s, 2m, 10m
 const RETRY_DELAYS_MS = [0, 5_000, 30_000, 120_000, 600_000];
-const PULL_INTERVAL_MS = 5 * 60 * 1_000;  // 5 minutes
 
 // ─── Pull types ───────────────────────────────────────────────────────────────
 
@@ -141,7 +139,6 @@ const NON_RETRIABLE_PREFIXES = new Set(['invalid_payload', 'unauthorized', 'not_
 
 export class SyncEngine {
   private flushTimer: ReturnType<typeof setInterval> | null = null;
-  private pullTimer: ReturnType<typeof setInterval> | null = null;
   private appStateSubscription: ReturnType<typeof AppState.addEventListener> | null = null;
   private lastAppState: string = AppState.currentState ?? 'active';
   private unsubscribeConnection: (() => void) | null = null;
@@ -220,17 +217,28 @@ export class SyncEngine {
         body: JSON.stringify(body),
       });
     } catch (error) {
-      // Error de red o auth: incrementar reintentos en todos + programar backoff
+      const msg = error instanceof Error ? error.message : 'network_error';
+      // HTTP 400 = schema validation failure: same payload will never succeed, drain queue.
+      // Any other error (5xx, network) is transient — retry with backoff.
+      const isSchemaRejection = msg.startsWith('HTTP 400');
       const now = Date.now();
       await database.write(async () => {
         for (const action of actions) {
-          const nextCount = action.retryCount + 1;
-          const delay = RETRY_DELAYS_MS[Math.min(nextCount, RETRY_DELAYS_MS.length - 1)];
-          this.nextRetryAt.set(action.id, now + delay);
-          await action.update((r) => {
-            r.retryCount = nextCount;
-            r.lastError = error instanceof Error ? error.message : 'network_error';
-          });
+          if (isSchemaRejection) {
+            this.nextRetryAt.set(action.id, Number.MAX_SAFE_INTEGER);
+            await action.update((r) => {
+              r.retryCount = MAX_RETRIES;
+              r.lastError = 'schema_rejected';
+            });
+          } else {
+            const nextCount = action.retryCount + 1;
+            const delay = RETRY_DELAYS_MS[Math.min(nextCount, RETRY_DELAYS_MS.length - 1)];
+            this.nextRetryAt.set(action.id, now + delay);
+            await action.update((r) => {
+              r.retryCount = nextCount;
+              r.lastError = msg;
+            });
+          }
         }
       });
       return;
@@ -524,10 +532,6 @@ export class SyncEngine {
       this.flush().catch(() => {});
     }, FLUSH_INTERVAL_MS);
 
-    this.pullTimer = setInterval(() => {
-      this.pull().catch(() => {});
-    }, PULL_INTERVAL_MS);
-
     this.pull().catch(() => {});
     this.bootstrap().catch(() => {});
 
@@ -548,10 +552,6 @@ export class SyncEngine {
     if (this.flushTimer) {
       clearInterval(this.flushTimer);
       this.flushTimer = null;
-    }
-    if (this.pullTimer) {
-      clearInterval(this.pullTimer);
-      this.pullTimer = null;
     }
     this.appStateSubscription?.remove();
     this.appStateSubscription = null;

@@ -333,8 +333,9 @@ async function _doBulkPersist(courses: CourseData[]): Promise<void> {
     }
   }
 
-  if (ops.length > 0) {
-    await database.write(() => database.batch(...ops));
+  const CHUNK = 1000;
+  for (let i = 0; i < ops.length; i += CHUNK) {
+    await database.write(async () => database.batch(...ops.slice(i, i + CHUNK)));
   }
 }
 

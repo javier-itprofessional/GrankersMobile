@@ -5,6 +5,7 @@ import { Users } from 'lucide-react-native';
 import Colors from '../../constants/colors';
 import { FontFamily } from '../../constants/Typography';
 import { useFreePlay } from '../../providers/FreePlayProvider';
+import { usePlayerAuth } from '../../providers/PlayerAuthProvider';
 import { createFreePlayGame } from '@/services/game-service';
 import PlayerCard from '../../components/PlayerCard';
 
@@ -29,6 +30,7 @@ export default function FreePlaySetupScreen() {
     gamePassword?: string;
   }>();
   const { resetFreePlay, setCourseInfo } = useFreePlay();
+  const { isAuthenticated, userProfile, userLicenses } = usePlayerAuth();
   const [players, setPlayers] = useState<{ id: string; firstName: string; lastName: string; license?: string; handicap?: string }[]>(() => {
     if (params.existingPlayers) {
       try { return JSON.parse(params.existingPlayers); } catch {}
@@ -43,6 +45,24 @@ export default function FreePlaySetupScreen() {
     }));
   });
   const [isSaving, setIsSaving] = useState<boolean>(false);
+
+  // Pre-fill Player 1 with the logged-in user's profile when it loads
+  useEffect(() => {
+    if (!isAuthenticated || !userProfile) return;
+    setPlayers((prev) => {
+      if (prev[0]?.firstName) return prev; // already filled, don't overwrite
+      const primaryLicense = userLicenses?.[0];
+      const updated = [...prev];
+      updated[0] = {
+        ...updated[0],
+        firstName: userProfile.first_name,
+        lastName: userProfile.last_name,
+        license: primaryLicense?.license_number,
+        handicap: primaryLicense?.handicap != null ? String(primaryLicense.handicap) : '',
+      };
+      return updated;
+    });
+  }, [isAuthenticated, userProfile, userLicenses]);
 
   useEffect(() => {
     const selectedPlayerId = params.selectedPlayerId;
@@ -179,16 +199,22 @@ export default function FreePlaySetupScreen() {
     try {
       const session = await createFreePlayGame(
         params.courseUuid,
-        playersData.map((p) => ({
-          playerExternalId: p.license ?? undefined,
-          handicap: parseFloat(p.handicap) || 0,
-        })),
+        [],
         { routeUuid: params.routeUuid || undefined, gameName: params.gameName }
       );
       sessionUuid = session.uuid;
       console.log('[FreePlay] ✅ Session created successfully, uuid:', sessionUuid);
     } catch (error) {
       console.error('[FreePlay] ❌ Error creating session:', error);
+      if ((error as Error)?.message === 'SESSION_EXPIRED') {
+        Alert.alert(
+          'Sesión expirada',
+          'Tu sesión ha expirado. Por favor, inicia sesión de nuevo.',
+          [{ text: 'Iniciar sesión', onPress: () => router.replace('/player-area/login') }]
+        );
+        setIsSaving(false);
+        return;
+      }
       Alert.alert('Error', 'No se pudo crear la partida. Verifica tu conexión a internet.', [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Continuar sin guardar', onPress: () => proceedToNextScreen(playersData, undefined) },
@@ -199,7 +225,23 @@ export default function FreePlaySetupScreen() {
       setIsSaving(false);
     }
 
-    proceedToNextScreen(playersData, sessionUuid);
+    if (isAuthenticated) {
+      router.push({
+        pathname: '/free-play/waiting-players',
+        params: {
+          players: JSON.stringify(playersData),
+          sessionUuid: sessionUuid ?? '',
+          devicePlayerId: playersData[0]?.id ?? '1',
+          courseName: params.courseName,
+          routeName: params.routeName,
+          gameName: params.gameName,
+          isPrivate: params.isPrivate,
+          gamePassword: params.gamePassword,
+        },
+      });
+    } else {
+      proceedToNextScreen(playersData, sessionUuid);
+    }
   };
 
   const proceedToNextScreen = (playersData: { id: string; firstName: string; lastName: string; handicap: string; license?: string }[], sessionUuid: string | undefined) => {

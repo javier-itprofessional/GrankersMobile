@@ -23,6 +23,8 @@ export default function SearchLicenseScreen() {
     playerIndex: string;
     numberOfPlayers?: string;
     existingPlayers?: string;
+    courseUuid?: string;
+    routeUuid?: string;
     courseName?: string;
     routeName?: string;
     gameName?: string;
@@ -45,6 +47,9 @@ export default function SearchLicenseScreen() {
     setSearching(true);
     setHasSearched(false);
     setResults([]);
+
+    // Yield to React so the spinner renders before the API call starts
+    await new Promise((r) => setTimeout(r, 0));
 
     try {
       console.log('Searching with params:', {
@@ -117,6 +122,8 @@ export default function SearchLicenseScreen() {
         selectedPlayerLicense: player.license,
         selectedPlayerHandicap: player.handicap?.toString() || '',
         existingPlayers: JSON.stringify(updatedPlayers),
+        courseUuid: params.courseUuid,
+        routeUuid: params.routeUuid,
         courseName: params.courseName,
         routeName: params.routeName,
         gameName: params.gameName,

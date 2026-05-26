@@ -13,6 +13,8 @@ export interface HoleScore {
   par: number;
   score: number;
   saved: boolean;
+  conflictScoreLocal?: number | null;   // self-recorded score (written at saveHole time)
+  conflictScoreMarker?: number | null;  // marker-recorded score (written when score_confirmed arrives)
 }
 
 export interface PlayerScores {

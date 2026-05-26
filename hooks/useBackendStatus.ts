@@ -15,7 +15,7 @@ export function useBackendStatus(): BackendStatus {
     const timer = setTimeout(() => controller.abort(), 5_000);
     try {
       const res = await fetch(`${API_URL}/api/v1/golf-federation/`, {
-        method: 'HEAD',
+        method: 'GET',
         signal: controller.signal,
       });
       if (!mounted.current) return;

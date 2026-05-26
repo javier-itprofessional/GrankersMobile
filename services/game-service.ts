@@ -131,6 +131,17 @@ interface WireScoringSession {
 
 // ─── Competition ──────────────────────────────────────────────────────────────
 
+export async function getMyTodayCompetition(): Promise<FirebaseCompetitionData | null> {
+  try {
+    const data = await apiRequest<FirebaseCompetitionData>('/api/v1/competitions/my-today/');
+    console.log('[getMyTodayCompetition] success, group_code:', data?.group_code);
+    return data;
+  } catch (e) {
+    console.log('[getMyTodayCompetition] error:', e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
 export async function fetchCompetitionData(
   groupCode: string
 ): Promise<FirebaseCompetitionData | null> {
@@ -258,7 +269,9 @@ export async function searchPlayerLicenses(
   if (searchParams.firstName) params.set('first_name', searchParams.firstName);
   if (searchParams.lastName) params.set('last_name', searchParams.lastName);
 
-  // DB search (registered Grankers users) and RFEG lookup run in parallel
+  // DB search (registered Grankers users) and RFEG lookup run in parallel.
+  // Auth errors (SESSION_EXPIRED) are re-thrown so the caller can show a
+  // proper error message. Other network errors degrade gracefully to [].
   const dbSearch = apiRequest<WireLicensePlayer[]>(`/api/v1/players/search/?${params.toString()}`)
     .then((wire) => wire.map((w): LicensePlayer => ({
       license: w.license,
@@ -267,7 +280,10 @@ export async function searchPlayerLicenses(
       handicap: w.handicap_index,
       avatarUrl: w.avatar_url,
     })))
-    .catch((): LicensePlayer[] => []);
+    .catch((err): LicensePlayer[] => {
+      if (err?.message === 'SESSION_EXPIRED') throw err;
+      return [];
+    });
 
   // Only call check_handicap when a license number is provided (public endpoint, no auth needed)
   const rfegLookup: Promise<LicensePlayer | null> = searchParams.license
@@ -283,10 +299,16 @@ export async function searchPlayerLicenses(
 
   const [dbResults, rfegResult] = await Promise.all([dbSearch, rfegLookup]);
 
-  // Merge: DB results take priority. Add RFEG result only if license not already in DB results.
+  // Merge: enrich DB record with RFEG data when DB is missing handicap/name.
+  // Only add as separate result if license not in DB at all.
   if (rfegResult) {
-    const dbLicenses = new Set(dbResults.map((p) => p.license?.toUpperCase()));
-    if (!dbLicenses.has(rfegResult.license?.toUpperCase())) {
+    const rfegLicense = rfegResult.license?.toUpperCase();
+    const dbMatch = dbResults.find((p) => p.license?.toUpperCase() === rfegLicense);
+    if (dbMatch) {
+      if (dbMatch.handicap === undefined || dbMatch.handicap === null) dbMatch.handicap = rfegResult.handicap;
+      if (!dbMatch.firstName) dbMatch.firstName = rfegResult.firstName;
+      if (!dbMatch.lastName) dbMatch.lastName = rfegResult.lastName;
+    } else {
       dbResults.push(rfegResult);
     }
   }

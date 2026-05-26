@@ -52,6 +52,7 @@ export interface UpcomingEvent {
   team_name: string | null;
   is_solo: boolean;
   team_size: string;
+  group_code: string | null;
 }
 
 export interface GolfFederation {
@@ -124,4 +125,18 @@ export function deleteLicense(licenseUuid: string): Promise<void> {
 
 export function getGolfFederations(): Promise<GolfFederation[]> {
   return apiRequest<GolfFederation[]>('/api/v1/golf-federation/');
+}
+
+export async function lookupFederationHandicap(
+  licenseNumber: string,
+  federationCode: string,
+): Promise<number | null> {
+  try {
+    const data = await apiRequest<{ handicap: number }>(
+      `/api/v1/user/check_handicap/?license=${encodeURIComponent(licenseNumber)}&federation=${encodeURIComponent(federationCode)}`
+    );
+    return data.handicap ?? null;
+  } catch {
+    return null;
+  }
 }

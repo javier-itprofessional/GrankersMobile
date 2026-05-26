@@ -1,6 +1,6 @@
 # Mobile TODO — Backend Integration
 
-> Actualizado 2026-04-24.  
+> Actualizado 2026-05-26.  
 > Referencia cruzada: backend `tasks/mobile-sync-todo.md` Phase 7.
 
 ---
@@ -20,7 +20,7 @@
 | §2.g | Organizer unlink → `not_started` | ✅ backend emite | ✅ **done** | Alert + isSessionActive=false |
 | §2.h | Organizer lifecycle (round_finished) | ✅ backend emite | ✅ **done** | isSessionActive=false en CompetitionProvider + FreePlayProvider |
 | §2.i | Organizer withdraw → `withdrawn` | ✅ backend emite | ✅ **done** | Alert + isSessionActive=false |
-| §3 | Sync pull incremental `GET /sync/pull/?since=` | ✅ shipped 7.2.b | ✅ **done** | SyncEngine.pull() + AppState + 5 min interval |
+| §3 | Sync pull incremental `GET /sync/pull/?since=` | ✅ shipped 7.2.b | ✅ **done** | SyncEngine.pull() + AppState only (interval eliminado) |
 | Phase 7.2.a | Bootstrap leaderboards en /sync/bootstrap/ | ✅ shipped | ✅ **done** | SyncEngine.bootstrap() — 24h guard + AppState |
 | Phase 7.2.b | Re-bootstrap ≥24h inactivity | ✅ shipped | ✅ **done** | `last_bootstrap_ms` en app_config; comprobado en start() y foreground |
 | Phase 7.2.c | `avatar_url` real en /players/search/ | ✅ shipped | ✅ **done** | `SearchResultCard` muestra imagen |
@@ -32,6 +32,17 @@
 | §5.a | `effective_scoring_entry_mode` en CompetitionProvider | ✅ shipped | ✅ **done** | `FirebaseCompetitionData` + `Competition.scoringMode` + startCompetition |
 | §5.b | Leaderboard REST fallback (WS cae 3×) | ✅ | ✅ **done** | `max_retries_reached` → poll `GET /scoring/leaderboard/{groupCode}/` cada 15s |
 | §5.c | WS `reconnected` cancela poll REST | ✅ | ✅ **done** | `reconnected` event en wsClient detiene el intervalo |
+| S-1 | HTTP 400 en POST /sync/ no reintenta | ✅ (backend devuelve 400) | ✅ **done** | `nextRetryAt = MAX_SAFE_INTEGER` + `retryCount = MAX_RETRIES` |
+| §6.a | `syncEngine.stop()` al terminar sesión (withdrawn) | ✅ emite WS | ✅ **done** | CompetitionProvider — stop() + Alert |
+| §6.b | Input de puntuación bloqueado si sesión terminada | — | ✅ **done** | `canEdit` incluye `isSessionActive` en scoring.tsx |
+| §6.c | `syncEngine.stop()` al desvincularse el dispositivo | ✅ emite WS | ✅ **done** | CompetitionProvider — stop() + Alert |
+| §8.a | `playing_handicap` y `tee_color` en endpoint jugadores | ✅ **shipped** | ✅ **done** | competitions.py ya los devuelve; code-entry.tsx los consume |
+| §8.c | `group_code` en upcoming-events | ⬜ **pendiente** | ✅ ready | UpcomingEvent ya tiene el campo; solo falta backend |
+| §9.a | `scored_by` en HOLE_SAVED payload | ✅ spec | ✅ **done** | `HoleSavedPayload.scores` incluye `scored_by: string` |
+| §9.b | `conflictScoreLocal`/`Marker` en HoleScore state | — | ✅ **done** | Tipos, DB reads en carga inicial, escritura en saveHole |
+| §9.c | WS handler `score_confirmed` enriquecido | ⬜ pendiente backend | ✅ **done** | CompetitionProvider escucha y escribe conflict fields a DB |
+| §9.d | `amendScore` callback | — | ✅ **done** | DB + state + `SCORE_AMENDED` action log |
+| §9.e | `comprobacion.tsx` cruce de puntuaciones | — | ✅ **done** | Columnas Marc./Yo, banner de conflictos, edición inline |
 
 ---
 
@@ -183,6 +194,38 @@ El handler está cableado. El publisher Celery ya activo.
 
 ---
 
+---
+
+## mobile-team-todo — Items aplicados (2026-05-26)
+
+Items del fichero `tasks/mobile-team-todo.md` del backend aplicados en esta sesión:
+
+### ✅ S-1 — Bucle de reintento infinito en POST /sync/ con HTTP 400
+
+**Fichero:** `services/sync-engine.ts` — método `sendBatch`
+
+HTTP 400 = rechazo de schema por el backend (error permanente, no transitorio). Se marca el action con `retryCount = MAX_RETRIES` y `nextRetryAt = MAX_SAFE_INTEGER` para sacarlo de la cola de reintentos. Antes, la cola se vaciaba reintenando indefinidamente.
+
+### ✅ §3 — Eliminar pull por intervalo (solo AppState)
+
+**Fichero:** `services/sync-engine.ts`
+
+Eliminados: constante `PULL_INTERVAL_MS`, campo `pullTimer`, `setInterval` en `start()`, `clearInterval` en `stop()`. El pull ahora se dispara únicamente cuando la app vuelve al primer plano vía AppState.
+
+### ✅ §6.a + §6.c — Llamar a `syncEngine.stop()` al terminar la sesión
+
+**Fichero:** `providers/CompetitionProvider.tsx`
+
+Se llama a `syncEngine.stop()` cuando el backend emite `player_status_changed` con `status === 'withdrawn'` o devuelve la sesión a `not_started` tras estar `ready/playing` (device unlinked por el organizador).
+
+### ✅ §6.b — Deshabilitar entrada de puntuación cuando la sesión no está activa
+
+**Fichero:** `app/competition/scoring.tsx`
+
+`canEdit` ahora incluye `isSessionActive` (de `CompetitionProvider`) además de `editMode || !holeSaved`. Si la sesión está terminada (`isSessionTerminated = true`), el input de puntuación queda bloqueado.
+
+---
+
 ## §6 — Tests a añadir
 
 - [ ] Integration: WS `score_confirmed` después de sync HTTP 200 → no doble-limpieza de cola
@@ -205,18 +248,45 @@ El handler está cableado. El publisher Celery ya activo.
 
 ---
 
+## §9 — Cruce de puntuaciones (scoring cross-reference) — 2026-05-26
+
+### ✅ Mobile — completado
+
+Cada dispositivo registra dos tarjetas: la propia (`scored_by === player_id`) y la del jugador marcado (`scored_by !== player_id`). Al terminar la ronda se cruzan por hoyo.
+
+**Cambios aplicados:**
+
+- `types/game.ts` — `HoleScore.conflictScoreLocal` y `conflictScoreMarker` (opcionales)
+- `services/websocket.ts` — `score_confirmed` payload extendido con `round_id`, `hole_number`, `scored_by`, `scores[]` (backward-compatible, todos opcionales)
+- `database/models/ActionLog.ts` — `HoleSavedPayload.scores` incluye `scored_by: string`
+- `providers/CompetitionProvider.tsx`:
+  - Carga inicial rellena `conflictScoreLocal/Marker` desde DB
+  - `saveHole`: escribe `conflictScoreLocal` en DB para el jugador del dispositivo; añade `scored_by` al payload HOLE_SAVED
+  - Nuevo `useEffect` para `score_confirmed`: escribe `conflictScoreLocal` o `conflictScoreMarker` según `scored_by`
+  - Nuevo `amendScore(playerId, holeNumber, agreedScore)`: DB + state + `SCORE_AMENDED` action log
+- `app/competition/comprobacion.tsx` — reescrito:
+  - Lee `conflictScoreMarker` directamente desde `playerScoresMap.get(currentDevicePlayerId)` (no del marcador)
+  - Modal con dos columnas: Marcador | Yo
+  - Banner rojo con lista de hoyos en conflicto
+  - Edición inline por hoyo → llama a `amendScore`
+  - Botón "Firmar" bloqueado mientras haya conflictos sin resolver
+
+### ⬜ Backend pendiente
+
+**Detalle completo:** `backend.todo.md` → sección "Cruce de puntuaciones"
+
+1. `MaterializedScore` — añadir `self_score` y `marker_score`
+2. Handler `HOLE_SAVED` — usar `scored_by` para rellenar el campo correcto
+3. Evento `score_confirmed` — enriquecer con `{round_id, hole_number, scored_by, scores[]}`
+4. Handler `SCORE_AMENDED` — actualizar `MaterializedScore.score` con `new_score`
+
+---
+
 ## §8 — Pendientes de backend (2026-05)
 
-### ⬜ 8.a — `playing_handicap` y `tee_color` en endpoint de jugadores del grupo
+### ✅ 8.a — `playing_handicap` y `tee_color` en endpoint de jugadores del grupo
 
-**Fichero backend:** `grankers-backend/src/api/v1/views/competitions.py`  
-**Detalle completo:** `backend.todo.md` → sección "Exponer playing_handicap y tee_color"
-
-`_serialize_competition_player` solo devuelve `id`, `first_name`, `last_name`, `license`. Falta:
-- `playing_handicap` — desde `ScoringSessionPlayer` si existe, fallback a `user_license.handicap`
-- `tee_color` — desde `ScoringSessionPlayer` si existe, fallback a `TourCategory.tee_color`
-
-**Impacto mobile:** Actualmente se muestra `userLicenses[0].handicap` (HCP de la licencia actual, no el playing handicap ajustado al campo). Una vez implementado, `code-entry.tsx` usará `player.playing_handicap` desde la respuesta de la API y se añade `tee_color?: string` a `FirebaseCompetitionData` en `types/game.ts`.
+Implementado en backend. `_serialize_competition_player` en `competitions.py` ya recibe un `ScoringSessionPlayer` pre-fetched y devuelve `playing_handicap` (con fallback a `user_license.handicap`) y `tee_color`. El móvil los consume en `code-entry.tsx`.
 
 ### ⬜ 8.b — Generar seed de campos de golf
 
@@ -231,6 +301,24 @@ docker compose --project-name grankers --file docker/docker-compose-dev.yml \
 ```
 
 Tras generar: commit + `bunx expo run:android` para bundlear el JSON.
+
+### ⬜ 8.c — Añadir `group_code` al endpoint upcoming-events
+
+**Prioridad:** Alta — bloquea el auto-load de competición para usuarios inscritos  
+**Fichero backend:** `grankers-backend/src/api/v1/views/user.py` — acción `upcoming_events`  
+**Detalle completo:** `backend.todo.md` → sección "Añadir group_code al endpoint de upcoming-events"
+
+`GET /api/v1/user/me/upcoming-events/` no incluye `group_code` en la respuesta aunque el dato está disponible vía `TourEventRegistration.tour_event_start_time.group_code`.
+
+**Cambio mínimo en backend:**
+```python
+# En select_related añadir:
+'tour_event_start_time',
+# En el dict de respuesta añadir:
+'group_code': r.tour_event_start_time.group_code if r.tour_event_start_time else None,
+```
+
+**Estado mobile:** `UpcomingEvent.group_code` ya existe en `services/user-service.ts` y el fallback en `code-entry.tsx` ya lo consume. Cero cambios en mobile una vez el backend lo exponga.
 
 ---
 
